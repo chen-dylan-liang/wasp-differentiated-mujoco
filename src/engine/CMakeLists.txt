@@ -37,6 +37,8 @@ set(MUJOCO_ENGINE_SRCS
     engine_derivative.h
     engine_derivative_fd.c
     engine_derivative_fd.h
+    engine_derivative_wasp.c
+    engine_derivative_wasp.h
     engine_forward.c
     engine_forward.h
     engine_global_table.h
