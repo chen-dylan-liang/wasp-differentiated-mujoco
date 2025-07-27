@@ -13,7 +13,8 @@
 extern "C" {
 #endif
     // wasp differenced transition matrices (control theory notation)
-    MJAPI void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte centered,
+    MJAPI void mjd_transitionWASP(const mjModel* m, mjData* d,
+                                mjtNum eps, mjtByte centered, int32_t* wasp_idx,
                                 mjtNum* A, mjtNum* B, mjtNum* C, mjtNum* D);
 
 

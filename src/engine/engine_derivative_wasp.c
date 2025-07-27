@@ -35,7 +35,8 @@
 //   single-letter shortcuts:
 //     inputs: q=qpos, v=qvel, a=activatoin, u=ctrl
 //     outputs: y=next_state (concatenated next qpos, qvel, act), s=sensordata
-void mjd_stepWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
+void mjd_stepWASP(const mjModel* m, mjData* d,
+                mjtNum eps, mjtByte flg_centered, int32_t* wasp_idx,
                 mjtNum* DyDq, mjtNum* DyDv, mjtNum* DyDa, mjtNum* DyDu,
                 mjtNum* DsDq, mjtNum* DsDv, mjtNum* DsDa, mjtNum* DsDu) {
 
@@ -77,13 +78,80 @@ void mjd_stepWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
     mj_setState(m, d, fullstate, restore_spec);
 
     // wasp-difference controls: skip=mjSTAGE_VEL, handle ctrl at range limits
-    if (DyDu || DsDu) {}
+    int32_t i = *wasp_idx;
+    if (DyDu || DsDu) {
+        // difference states
+        if (DyDu) {
+            clampedStateDiff(m, DyDu+i*ndx, next, nudge_fwd ? next_plus : NULL,
+                             nudge_back ? next_minus : NULL, eps);
+        }
+
+        // difference sensors
+        if (DsDu) {
+            clampedDiff(DsDu+i*ns, sensor, nudge_fwd ? sensor_plus : NULL,
+                        nudge_back ? sensor_minus : NULL, eps, ns);
+        }
+    }
     // wasp-difference activations: skip=mjSTAGE_VEL
-    if (DyDa || DsDa) {}
+    if (DyDa || DsDa) {
+        // difference states
+        if (DyDa) {
+            if (!flg_centered) {
+                stateDiff(m, DyDa+i*ndx, next, next_plus, eps);
+            } else {
+                stateDiff(m, DyDa+i*ndx, next_minus, next_plus, 2*eps);
+            }
+        }
+
+        // difference sensors
+        if (DsDa) {
+            if (!flg_centered) {
+                diff(DsDa+i*ns, sensor, sensor_plus, eps, ns);
+            } else {
+                diff(DsDa+i*ns, sensor_minus, sensor_plus, 2*eps, ns);
+            }
+        }
+    }
     // wasp-difference velocities: skip=mjSTAGE_POS
-    if (DyDv || DsDv) {}
+    if (DyDv || DsDv) {
+        // difference states
+        if (DyDv) {
+            if (!flg_centered) {
+                stateDiff(m, DyDv+i*ndx, next, next_plus, eps);
+            } else {
+                stateDiff(m, DyDv+i*ndx, next_minus, next_plus, 2*eps);
+            }
+        }
+
+        // difference sensors
+        if (DsDv) {
+            if (!flg_centered) {
+                diff(DsDv+i*ns, sensor, sensor_plus, eps, ns);
+            } else {
+                diff(DsDv+i*ns, sensor_minus, sensor_plus, 2*eps, ns);
+            }
+        }
+    }
     // wasp-difference positions: skip=mjSTAGE_NONE
-    if (DyDq || DsDq) {}
+    if (DyDq || DsDq) {
+        // difference states
+        if (DyDq) {
+            if (!flg_centered) {
+                stateDiff(m, DyDq+i*ndx, next, next_plus, eps);
+            } else {
+                stateDiff(m, DyDq+i*ndx, next_minus, next_plus, 2*eps);
+            }
+        }
+
+        // difference sensors
+        if (DsDq) {
+            if (!flg_centered) {
+                diff(DsDq+i*ns, sensor, sensor_plus, eps, ns);
+            } else {
+                diff(DsDq+i*ns, sensor_minus, sensor_plus, 2*eps, ns);
+            }
+        }
+    }
     mj_freeStack(d);
 }
 
@@ -100,7 +168,7 @@ void mjd_stepWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
 //      B: model Jacobian wrt action, (dim_state * dim_action)
 //      C: sensor Jacobian wrt state, (dim_sensor * dim_state)
 //      D: sensor Jacobian wrt action, (dim_sensor * dim_action)
-void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
+void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered, int32_t* wasp_idx,
                       mjtNum* A, mjtNum* B, mjtNum* C, mjtNum* D){
 
     if (m->opt.integrator == mjINT_RK4) {
@@ -136,7 +204,7 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
     }
 
     // get Jacobians
-    mjd_stepWASP(m, d, eps, flg_centered, DyDq, DyDv, DyDa, BT, DsDq, DsDv, DsDa, DT);
+    mjd_stepWASP(m, d, eps, flg_centered, wasp_idx,DyDq, DyDv, DyDa, BT, DsDq, DsDv, DsDa, DT);
 
 
     // transpose
