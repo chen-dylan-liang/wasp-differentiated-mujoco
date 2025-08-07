@@ -24,21 +24,23 @@
 //   wasp differentiate Jacobian of  (next_state, sensors) = mj_step(state, control)
 //   all outputs are optional
 //   output dimensions (transposed w.r.t Control Theory convention):
-//     DyDq: (nv x dim_state)
-//     DyDv: (nv x dim_state)
-//     DyDa: (na x dim_state)
-//     DyDu: (nu x dim_state)
-//     DsDq: (nv x dim_sensor)
-//     DsDv: (nv x dim_sensor)
-//     DsDa: (na x dim_sensor)
-//     DsDu: (nu x dim_sensor)
+//     DyDq: (nx x nv)
+//     DyDv: (nv x nv)
+//     DyDa: (nv x na)
+//     DyDu: (nv x nu)
+//     DsDq: (ns x nv)
+//     DsDv: (ns x nv)
+//     DsDa: (ns x na)
+//     DsDu: (ns x nu)
 //   single-letter shortcuts:
 //     inputs: q=qpos, v=qvel, a=activatoin, u=ctrl
-//     outputs: y=next_state (concatenated next qpos, qvel, act), s=sensordata
+//     outputs: y=next_state (concatenated next qpos, qvel, activation), s=sensordata
 void mjd_stepWASP(const mjModel* m, mjData* d,
-                mjtNum eps, mjtByte flg_centered, int32_t* wasp_idx,
-                mjtNum* DyDq, mjtNum* DyDv, mjtNum* DyDa, mjtNum* DyDu,
-                mjtNum* DsDq, mjtNum* DsDv, mjtNum* DsDa, mjtNum* DsDu) {
+                mjtNum eps, mjtByte flg_centered,
+                mjWASPCache* DyDq, mjWASPCache* DyDv, mjWASPCache* DyDa,
+                mjWASPCache* DyDu,
+                mjWASPCache* DsDq, mjWASPCache* DsDv, mjWASPCache* DsDa,
+                mjWASPCache* DsDu) {
 
     int nq = m->nq, nv = m->nv, na = m->na, nu = m->nu, ns = m->nsensordata;
     int ndx = 2*nv+na;  // row length of Dy Jacobians
@@ -78,7 +80,6 @@ void mjd_stepWASP(const mjModel* m, mjData* d,
     mj_setState(m, d, fullstate, restore_spec);
 
     // wasp-difference controls: skip=mjSTAGE_VEL, handle ctrl at range limits
-    int32_t i = *wasp_idx;
     if (DyDu || DsDu) {
         // difference states
         if (DyDu) {
@@ -155,21 +156,37 @@ void mjd_stepWASP(const mjModel* m, mjData* d,
     mj_freeStack(d);
 }
 
-
-
+// dim(res) = m x n
+// D = F_hat * C1^T + fi * C2^T
+// F_hat = D * Delta_X
+static void waspUpdate(mjData* d, mjtNum* res, mjWASPCache* cache, int m, int n){
+    size_t i = cache->i;
+    mjtNum* tmp =  mj_stackAllocNum(d, m*n);
+    mju_mulMatMatT(res, cache->F_hat, (cache->C1)+i*n*n, m, n, n);
+    mju_mulMatMatT(tmp, cache->fi, (cache->C2)+i, m, 1, n);
+    mju_addToMat(res, tmp, m, m);
+    mju_mulMatMat(cache->F_hat, res, cache->Delta_X, n, n, n);
+    cache->i = (i+1)%n;
+}
 
 
 
 // wasp differenced transition matrices (control theory notation)
-//   d(x_next) = A*dx + B*du
-//   d(sensor) = C*dx + D*du
+//   d(x_next) = A*Dx + B*Du
+//   d(sensor) = C*Dx + D*Du
 //   required output matrix dimensions:
-//      A: model Jacobian wrt state, (dim_state* dim_state)
-//      B: model Jacobian wrt action, (dim_state * dim_action)
-//      C: sensor Jacobian wrt state, (dim_sensor * dim_state)
-//      D: sensor Jacobian wrt action, (dim_sensor * dim_action)
-void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered, int32_t* wasp_idx,
-                      mjtNum* A, mjtNum* B, mjtNum* C, mjtNum* D){
+//      nx = nq + nv + na (position + velocity + activation)
+//      A: model Jacobian wrt state, (nx * nx)
+//      B: model Jacobian wrt control, (nx * nu)
+//      C: sensor Jacobian wrt state, (ns * nx)
+//      D: sensor Jacobian wrt control, (nx * nu)
+
+void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
+                        mjtNum* A, mjtNum* B, mjtNum* C, mjtNum* D,
+                        mjWASPCache* DyDq_cache, mjWASPCache* DyDv_cache, mjWASPCache* DyDa_cache,
+                        mjWASPCache* DyDu_cache,
+                        mjWASPCache* DsDq_cache, mjWASPCache* DsDv_cache, mjWASPCache* DsDa_cache,
+                        mjWASPCache* DsDu_cache){
 
     if (m->opt.integrator == mjINT_RK4) {
         mjERROR("RK4 integrator is not supported");
@@ -178,40 +195,41 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
     int nv = m->nv, na = m->na, nu = m->nu, ns = m->nsensordata;
     int ndx = 2*nv+na;  // row length of state Jacobians
 
-    // stepFD() offset pointers, initialised to NULL
-    mjtNum *DyDq, *DyDv, *DyDa, *DsDq, *DsDv, *DsDa;
-    DyDq = DyDv = DyDa = DsDq = DsDv = DsDa = NULL;
+    // finite difference on the specific dimensions
+    mjd_stepWASP(m, d, eps, flg_centered, DyDq_cache, DyDv_cache, DyDa_cache,
+                 DyDu_cache,
+                 DsDq_cache, DsDv_cache, DsDa_cache,
+                 DsDu_cache);
 
-    mj_markStack(d);
-
-    // allocate transposed matrices
-    mjtNum *AT = A ? mj_stackAllocNum(d, ndx*ndx) : NULL;  // state-transition matrix   (transposed)
-    mjtNum *BT = B ? mj_stackAllocNum(d, nu*ndx) : NULL;   // control-transition matrix (transposed)
-    mjtNum *CT = C ? mj_stackAllocNum(d, ndx*ns) : NULL;   // state-observation matrix   (transposed)
-    mjtNum *DT = D ? mj_stackAllocNum(d, nu*ns) : NULL;    // control-observation matrix (transposed)
-
-    // set offset pointers
     if (A) {
-        DyDq = AT;
-        DyDv = AT+ndx*nv;
-        DyDa = AT+ndx*2*nv;
-    }
+        if (DyDq_cache){
+            waspUpdate(d, A, DyDq_cache, ndx, nv);
+        }
+        if (DyDv_cache){
+            waspUpdate(d, A+nv, DyDv_cache, ndx, nv);
+        }
+        if (DyDa_cache){
+            waspUpdate(d, A+2*nv, DyDa_cache, ndx, na);
+        }
 
+    }
+    if (B&&DyDu_cache) {
+        waspUpdate(d, B, DyDu_cache, ndx, nu);
+    }
     if (C) {
-        DsDq = CT;
-        DsDv = CT + ns*nv;
-        DsDa = CT + ns*2*nv;
+        if (DsDq_cache){
+            waspUpdate(d, C, DsDq_cache, ns, nv);
+        }
+        if (DsDv_cache){
+            waspUpdate(d, C+nv, DsDv_cache, ns, nv);
+        }
+        if (DsDa_cache){
+            waspUpdate(d, C+2*nv, DsDa_cache, ns, na);
+        }
     }
-
-    // get Jacobians
-    mjd_stepWASP(m, d, eps, flg_centered, wasp_idx,DyDq, DyDv, DyDa, BT, DsDq, DsDv, DsDa, DT);
-
-
-    // transpose
-    if (A) mju_transpose(A, AT, ndx, ndx);
-    if (B) mju_transpose(B, BT, nu, ndx);
-    if (C) mju_transpose(C, CT, ndx, ns);
-    if (D) mju_transpose(D, DT, nu, ns);
+    if (D&&DsDu_cache) {
+        waspUpdate(d, D, DsDu_cache, ns, nu);
+    }
 
     mj_freeStack(d);
 }

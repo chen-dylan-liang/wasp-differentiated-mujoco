@@ -229,6 +229,8 @@ MJAPI void mju_mulMatTMat(mjtNum* res, const mjtNum* mat1, const mjtNum* mat2,
 // compute M'*diag*M (diag=NULL: compute M'*M)
 MJAPI void mju_sqrMatTD(mjtNum* res, const mjtNum* mat, const mjtNum* diag, int nr, int nc);
 
+// res += M
+MJAPI void mju_addToMat(mjtNum* res, const mjtNum* mat, int nr, int nc);_
 #ifdef __cplusplus
 }
 #endif

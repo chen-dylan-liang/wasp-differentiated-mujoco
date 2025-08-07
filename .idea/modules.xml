@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/mujoco.iml" filepath="$PROJECT_DIR$/.idea/mujoco.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/wasp-differentiated-mujoco.iml" filepath="$PROJECT_DIR$/.idea/wasp-differentiated-mujoco.iml" />
     </modules>
   </component>
 </project>

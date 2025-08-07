@@ -16,7 +16,7 @@
 .idea/
 # Exclude temporary folders
 *.egg-info/
-build/
+*build*/
 build_cmake/
 python/dist/
 
