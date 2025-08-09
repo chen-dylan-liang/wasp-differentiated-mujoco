@@ -8,7 +8,7 @@
 #include <mujoco/mjdata.h>
 #include <mujoco/mjexport.h>
 #include <mujoco/mjmodel.h>
-
+#include "engine_derivative_fd.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

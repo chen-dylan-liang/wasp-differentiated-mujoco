@@ -29,40 +29,38 @@
 #include "engine/engine_util_errmem.h"
 #include "engine/engine_util_misc.h"
 
-
-
 //--------------------------- finite-differencing utility functions --------------------------------
 
 // get state=[qpos; qvel; act] and optionally sensordata
 static void getState(const mjModel* m, const mjData* d, mjtNum* state, mjtNum* sensordata) {
-  mj_getState(m, d, state, mjSTATE_PHYSICS);
-  if (sensordata) {
-    mju_copy(sensordata, d->sensordata, m->nsensordata);
-  }
+    mj_getState(m, d, state, mjSTATE_PHYSICS);
+    if (sensordata) {
+        mju_copy(sensordata, d->sensordata, m->nsensordata);
+    }
 }
 
 
 
 // dx = (x2 - x1) / h
 static void diff(mjtNum* restrict dx, const mjtNum* x1, const mjtNum* x2, mjtNum h, int n) {
-  mjtNum inv_h = 1/h;
-  for (int i=0; i < n; i++) {
-    dx[i] = inv_h * (x2[i] - x1[i]);
-  }
+    mjtNum inv_h = 1/h;
+    for (int i=0; i < n; i++) {
+        dx[i] = inv_h * (x2[i] - x1[i]);
+    }
 }
 
 
 
 // finite-difference two state vectors ds = (s2 - s1) / h
 static void stateDiff(const mjModel* m, mjtNum* ds, const mjtNum* s1, const mjtNum* s2, mjtNum h) {
-  int nq = m->nq, nv = m->nv, na = m->na;
+    int nq = m->nq, nv = m->nv, na = m->na;
 
-  if (nq == nv) {
-    diff(ds, s1, s2, h, nq+nv+na);
-  } else {
-    mj_differentiatePos(m, ds, h, s1, s2);
-    diff(ds+nv, s1+nq, s2+nq, h, nv+na);
-  }
+    if (nq == nv) {
+        diff(ds, s1, s2, h, nq+nv+na);
+    } else {
+        mj_differentiatePos(m, ds, h, s1, s2);
+        diff(ds+nv, s1+nq, s2+nq, h, nv+na);
+    }
 }
 
 
@@ -70,19 +68,19 @@ static void stateDiff(const mjModel* m, mjtNum* ds, const mjtNum* s1, const mjtN
 // finite-difference two vectors, forward, backward or centered
 static void clampedDiff(mjtNum* dx, const mjtNum* x, const mjtNum* x_plus, const mjtNum* x_minus,
                         mjtNum h, int nx) {
-  if (x_plus && !x_minus) {
-    // forward differencing
-    diff(dx, x, x_plus, h, nx);
-  } else if (!x_plus && x_minus) {
-    // backward differencing
-    diff(dx, x_minus, x, h, nx);
-  } else if (x_plus && x_minus) {
-    // centered differencing
-    diff(dx, x_plus, x_minus, 2*h, nx);
-  } else {
-    // differencing failed, write zeros
-    mju_zero(dx, nx);
-  }
+    if (x_plus && !x_minus) {
+        // forward differencing
+        diff(dx, x, x_plus, h, nx);
+    } else if (!x_plus && x_minus) {
+        // backward differencing
+        diff(dx, x_minus, x, h, nx);
+    } else if (x_plus && x_minus) {
+        // centered differencing
+        diff(dx, x_plus, x_minus, 2*h, nx);
+    } else {
+        // differencing failed, write zeros
+        mju_zero(dx, nx);
+    }
 }
 
 
@@ -90,30 +88,39 @@ static void clampedDiff(mjtNum* dx, const mjtNum* x, const mjtNum* x_plus, const
 // finite-difference two state vectors, forward, backward or centered
 static void clampedStateDiff(const mjModel* m, mjtNum* ds, const mjtNum* s, const mjtNum* s_plus,
                              const mjtNum* s_minus, mjtNum h) {
-  if (s_plus && !s_minus) {
-    // forward differencing
-    stateDiff(m, ds, s, s_plus, h);
-  } else if (!s_plus && s_minus) {
-    // backward differencing
-    stateDiff(m, ds, s_minus, s, h);
-  } else if (s_plus && s_minus) {
-    // centered differencing
-    stateDiff(m, ds, s_minus, s_plus, 2*h);
-  } else {
-    // differencing failed, write zeros
-    mju_zero(ds, 2*m->nv + m->na);
-  }
+    if (s_plus && !s_minus) {
+        // forward differencing
+        stateDiff(m, ds, s, s_plus, h);
+    } else if (!s_plus && s_minus) {
+        // backward differencing
+        stateDiff(m, ds, s_minus, s, h);
+    } else if (s_plus && s_minus) {
+        // centered differencing
+        stateDiff(m, ds, s_minus, s_plus, 2*h);
+    } else {
+        // differencing failed, write zeros
+        mju_zero(ds, 2*m->nv + m->na);
+    }
 }
 
 
 
 // check if two numbers are inside a given range
 static int inRange(const mjtNum x1, const mjtNum x2, const mjtNum* range) {
-  return x1 >= range[0] && x1 <= range[1] &&
-         x2 >= range[0] && x2 <= range[1];
+    return x1 >= range[0] && x1 <= range[1] &&
+           x2 >= range[0] && x2 <= range[1];
 }
 
-
+// compute qfrc_inverse, optionally subtracting qfrc_actuator
+static void inverseSkip(const mjModel* m, mjData* d, mjtStage stage, int skipsensor,
+                        int flg_actuation, mjtNum* force) {
+    mj_inverseSkip(m, d, stage, skipsensor);
+    mju_copy(force, d->qfrc_inverse, m->nv);
+    if (flg_actuation) {
+        mj_fwdActuation(m, d);
+        mju_subFrom(force, d->qfrc_actuator, m->nv);
+    }
+}
 
 // advance simulation using control callback, skipstage is mjtStage
 void mj_stepSkip(const mjModel* m, mjData* d, int skipstage, int skipsensor) {
@@ -152,21 +159,6 @@ void mj_stepSkip(const mjModel* m, mjData* d, int skipstage, int skipsensor) {
 
   TM_END(mjTIMER_STEP);
 }
-
-
-
-// compute qfrc_inverse, optionally subtracting qfrc_actuator
-static void inverseSkip(const mjModel* m, mjData* d, mjtStage stage, int skipsensor,
-                        int flg_actuation, mjtNum* force) {
-  mj_inverseSkip(m, d, stage, skipsensor);
-  mju_copy(force, d->qfrc_inverse, m->nv);
-  if (flg_actuation) {
-    mj_fwdActuation(m, d);
-    mju_subFrom(force, d->qfrc_actuator, m->nv);
-  }
-}
-
-
 
 //------------------------- derivatives of passive forces ------------------------------------------
 

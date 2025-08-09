@@ -2,7 +2,7 @@
 // Created by dylan on 7/26/25.
 //
 #include "engine/engine_derivative_wasp.h"
-#include "engine/engine_derivative_fd.c"
+
 
 #include <stddef.h>
 #include <string.h>
@@ -19,6 +19,88 @@
 #include "engine/engine_util_errmem.h"
 #include "engine/engine_util_misc.h"
 
+
+//--------------------------- static utility functions copied directly from engine_derivative_fd.c--------------------------------
+
+// get state=[qpos; qvel; act] and optionally sensordata
+static void getState(const mjModel* m, const mjData* d, mjtNum* state, mjtNum* sensordata) {
+    mj_getState(m, d, state, mjSTATE_PHYSICS);
+    if (sensordata) {
+        mju_copy(sensordata, d->sensordata, m->nsensordata);
+    }
+}
+
+
+
+// dx = (x2 - x1) / h
+static void diff(mjtNum* restrict dx, const mjtNum* x1, const mjtNum* x2, mjtNum h, int n) {
+    mjtNum inv_h = 1/h;
+    for (int i=0; i < n; i++) {
+        dx[i] = inv_h * (x2[i] - x1[i]);
+    }
+}
+
+
+
+// finite-difference two state vectors ds = (s2 - s1) / h
+static void stateDiff(const mjModel* m, mjtNum* ds, const mjtNum* s1, const mjtNum* s2, mjtNum h) {
+    int nq = m->nq, nv = m->nv, na = m->na;
+
+    if (nq == nv) {
+        diff(ds, s1, s2, h, nq+nv+na);
+    } else {
+        mj_differentiatePos(m, ds, h, s1, s2);
+        diff(ds+nv, s1+nq, s2+nq, h, nv+na);
+    }
+}
+
+
+
+// finite-difference two vectors, forward, backward or centered
+static void clampedDiff(mjtNum* dx, const mjtNum* x, const mjtNum* x_plus, const mjtNum* x_minus,
+                        mjtNum h, int nx) {
+    if (x_plus && !x_minus) {
+        // forward differencing
+        diff(dx, x, x_plus, h, nx);
+    } else if (!x_plus && x_minus) {
+        // backward differencing
+        diff(dx, x_minus, x, h, nx);
+    } else if (x_plus && x_minus) {
+        // centered differencing
+        diff(dx, x_plus, x_minus, 2*h, nx);
+    } else {
+        // differencing failed, write zeros
+        mju_zero(dx, nx);
+    }
+}
+
+
+
+// finite-difference two state vectors, forward, backward or centered
+static void clampedStateDiff(const mjModel* m, mjtNum* ds, const mjtNum* s, const mjtNum* s_plus,
+                             const mjtNum* s_minus, mjtNum h) {
+    if (s_plus && !s_minus) {
+        // forward differencing
+        stateDiff(m, ds, s, s_plus, h);
+    } else if (!s_plus && s_minus) {
+        // backward differencing
+        stateDiff(m, ds, s_minus, s, h);
+    } else if (s_plus && s_minus) {
+        // centered differencing
+        stateDiff(m, ds, s_minus, s_plus, 2*h);
+    } else {
+        // differencing failed, write zeros
+        mju_zero(ds, 2*m->nv + m->na);
+    }
+}
+
+
+
+// check if two numbers are inside a given range
+static int inRange(const mjtNum x1, const mjtNum x2, const mjtNum* range) {
+    return x1 >= range[0] && x1 <= range[1] &&
+           x2 >= range[0] && x2 <= range[1];
+}
 
 
 //   wasp differentiate Jacobian of  (next_state, sensors) = mj_step(state, control)
@@ -300,6 +382,7 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
     }
 
     int nv = m->nv, na = m->na, nu = m->nu, ns = m->nsensordata;
+    int ndx = 2*nv+na;  // row length of state Jacobians
 
     // finite difference on the specific dimensions
     mjd_stepWASP(m, d, eps, flg_centered, DyDq_cache, DyDv_cache, DyDa_cache,

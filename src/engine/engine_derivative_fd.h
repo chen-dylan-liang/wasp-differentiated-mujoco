@@ -18,6 +18,17 @@
 #include <mujoco/mjdata.h>
 #include <mujoco/mjexport.h>
 #include <mujoco/mjmodel.h>
+#include <mujoco/mjdata.h>
+#include <mujoco/mjmacro.h>
+#include <mujoco/mjmodel.h>
+#include "engine/engine_forward.h"
+#include "engine/engine_io.h"
+#include "engine/engine_inverse.h"
+#include "engine/engine_macro.h"
+#include "engine/engine_support.h"
+#include "engine/engine_util_blas.h"
+#include "engine/engine_util_errmem.h"
+#include "engine/engine_util_misc.h"
 
 #ifdef __cplusplus
 extern "C" {
