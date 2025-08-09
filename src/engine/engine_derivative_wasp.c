@@ -43,7 +43,6 @@ void mjd_stepWASP(const mjModel* m, mjData* d,
                 mjWASPCache* DsDu) {
 
     int nq = m->nq, nv = m->nv, na = m->na, nu = m->nu, ns = m->nsensordata;
-    int ndx = 2*nv+na;  // col length of Dy Jacobians
     mj_markStack(d);
 
     // state to restore after finite differencing
@@ -301,7 +300,6 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
     }
 
     int nv = m->nv, na = m->na, nu = m->nu, ns = m->nsensordata;
-    int ndx = 2*nv+na;  // row length of state Jacobians
 
     // finite difference on the specific dimensions
     mjd_stepWASP(m, d, eps, flg_centered, DyDq_cache, DyDv_cache, DyDa_cache,
@@ -309,6 +307,7 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
                  DsDq_cache, DsDv_cache, DsDa_cache,
                  DsDu_cache);
 
+    mj_markStack(d);
     if (A) {
         if (DyDq_cache){
             waspUpdate(d, A, DyDq_cache, ndx, nv);

@@ -1320,7 +1320,7 @@ MJAPI void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte f
                         mjWASPCache* DyDq_cache, mjWASPCache* DyDv_cache, mjWASPCache* DyDa_cache,
                         mjWASPCache* DyDu_cache,
                         mjWASPCache* DsDq_cache, mjWASPCache* DsDv_cache, mjWASPCache* DsDa_cache,
-                        mjWASPCache* DsDu_cache)
+                        mjWASPCache* DsDu_cache);
 
 // Finite differenced Jacobians of (force, sensors) = mj_inverse(state, acceleration)
 //   All outputs are optional. Output dimensions (transposed w.r.t Control Theory convention):
