@@ -43,7 +43,7 @@ void mjd_stepWASP(const mjModel* m, mjData* d,
                 mjWASPCache* DsDu) {
 
     int nq = m->nq, nv = m->nv, na = m->na, nu = m->nu, ns = m->nsensordata;
-    int ndx = 2*nv+na;  // row length of Dy Jacobians
+    int ndx = 2*nv+na;  // col length of Dy Jacobians
     mj_markStack(d);
 
     // state to restore after finite differencing
@@ -81,75 +81,184 @@ void mjd_stepWASP(const mjModel* m, mjData* d,
 
     // wasp-difference controls: skip=mjSTAGE_VEL, handle ctrl at range limits
     if (DyDu || DsDu) {
+        size_t iu = DyDu->i;
+        int limited = m->actuator_ctrllimited[iu];
+        // nudge forward, if possible given ctrlrange
+        int nudge_fwd = !limited || inRange(ctrl[iu], ctrl[iu]+eps, m->actuator_ctrlrange+2*iu);
+        if (nudge_fwd) {
+            // nudge forward
+            d->ctrl[iu] += eps;
+
+            // step, get nudged output
+            mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
+            getState(m, d, next_plus, sensor_plus);
+
+            // reset
+            mj_setState(m, d, fullstate, restore_spec);
+        }
+
+        // nudge backward, if possible given ctrlrange
+        int nudge_back = (flg_centered || !nudge_fwd) &&
+                         (!limited || inRange(ctrl[iu]-eps, ctrl[iu], m->actuator_ctrlrange+2*iu));
+        if (nudge_back) {
+            // nudge backward
+            d->ctrl[iu] -= eps;
+
+            // step, get nudged output
+            mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
+            getState(m, d, next_minus, sensor_minus);
+
+            // reset
+            mj_setState(m, d, fullstate, restore_spec);
+        }
+
         // difference states
         if (DyDu) {
-            clampedStateDiff(m, DyDu+i*ndx, next, nudge_fwd ? next_plus : NULL,
+            clampedStateDiff(m, DyDu->fi, next, nudge_fwd ? next_plus : NULL,
                              nudge_back ? next_minus : NULL, eps);
         }
 
         // difference sensors
         if (DsDu) {
-            clampedDiff(DsDu+i*ns, sensor, nudge_fwd ? sensor_plus : NULL,
+            clampedDiff(DsDu->fi, sensor, nudge_fwd ? sensor_plus : NULL,
                         nudge_back ? sensor_minus : NULL, eps, ns);
         }
     }
+
     // wasp-difference activations: skip=mjSTAGE_VEL
     if (DyDa || DsDa) {
+        size_t ia = DyDa->i;
+        // nudge forward
+        d->act[ia] += eps;
+
+        // step, get nudged output
+        mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
+        getState(m, d, next_plus, sensor_plus);
+
+        // reset
+        mj_setState(m, d, fullstate, restore_spec);
+
+        // nudge backward
+        if (flg_centered) {
+            // nudge backward
+            d->act[ia] -= eps;
+
+            // step, get nudged output
+            mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
+            getState(m, d, next_minus, sensor_minus);
+
+            // reset
+            mj_setState(m, d, fullstate, restore_spec);
+        }
         // difference states
         if (DyDa) {
             if (!flg_centered) {
-                stateDiff(m, DyDa+i*ndx, next, next_plus, eps);
+                stateDiff(m, DyDa->fi, next, next_plus, eps);
             } else {
-                stateDiff(m, DyDa+i*ndx, next_minus, next_plus, 2*eps);
+                stateDiff(m, DyDa->fi, next_minus, next_plus, 2*eps);
             }
         }
 
         // difference sensors
         if (DsDa) {
             if (!flg_centered) {
-                diff(DsDa+i*ns, sensor, sensor_plus, eps, ns);
+                diff(DsDa->fi, sensor, sensor_plus, eps, ns);
             } else {
-                diff(DsDa+i*ns, sensor_minus, sensor_plus, 2*eps, ns);
+                diff(DsDa->fi, sensor_minus, sensor_plus, 2*eps, ns);
             }
         }
     }
+
     // wasp-difference velocities: skip=mjSTAGE_POS
     if (DyDv || DsDv) {
+        size_t iv = DyDv->i;
+        // nudge forward
+        d->qvel[iv] += eps;
+
+        // step, get nudged output
+        mj_stepSkip(m, d, mjSTAGE_POS, skipsensor);
+        getState(m, d, next_plus, sensor_plus);
+
+        // reset
+        mj_setState(m, d, fullstate, restore_spec);
+
+        // nudge backward
+        if (flg_centered) {
+            // nudge
+            d->qvel[iv] -= eps;
+
+            // step, get nudged output
+            mj_stepSkip(m, d, mjSTAGE_POS, skipsensor);
+            getState(m, d, next_minus, sensor_minus);
+
+            // reset
+            mj_setState(m, d, fullstate, restore_spec);
+        }
         // difference states
         if (DyDv) {
             if (!flg_centered) {
-                stateDiff(m, DyDv+i*ndx, next, next_plus, eps);
+                stateDiff(m, DyDv->fi, next, next_plus, eps);
             } else {
-                stateDiff(m, DyDv+i*ndx, next_minus, next_plus, 2*eps);
+                stateDiff(m, DyDv->fi, next_minus, next_plus, 2*eps);
             }
         }
 
         // difference sensors
         if (DsDv) {
             if (!flg_centered) {
-                diff(DsDv+i*ns, sensor, sensor_plus, eps, ns);
+                diff(DsDv->fi, sensor, sensor_plus, eps, ns);
             } else {
-                diff(DsDv+i*ns, sensor_minus, sensor_plus, 2*eps, ns);
+                diff(DsDv->fi, sensor_minus, sensor_plus, 2*eps, ns);
             }
         }
     }
+
     // wasp-difference positions: skip=mjSTAGE_NONE
     if (DyDq || DsDq) {
+        size_t iq = DyDq->i;
+        mjtNum *dpos  = mj_stackAllocNum(d, nv);  // allocate position perturbation
+        // nudge forward
+        mju_zero(dpos, nv);
+        dpos[iq] = 1;
+        mj_integratePos(m, d->qpos, dpos, eps);
+
+        // step, get nudged output
+        mj_stepSkip(m, d, mjSTAGE_NONE, skipsensor);
+        getState(m, d, next_plus, sensor_plus);
+
+        // reset
+        mj_setState(m, d, fullstate, restore_spec);
+
+        // nudge backward
+        if (flg_centered) {
+            // nudge backward
+            mju_zero(dpos, nv);
+            dpos[iq] = 1;
+            mj_integratePos(m, d->qpos, dpos, -eps);
+
+            // step, get nudged output
+            mj_stepSkip(m, d, mjSTAGE_NONE, skipsensor);
+            getState(m, d, next_minus, sensor_minus);
+
+            // reset
+            mj_setState(m, d, fullstate, restore_spec);
+        }
+
         // difference states
         if (DyDq) {
             if (!flg_centered) {
-                stateDiff(m, DyDq+i*ndx, next, next_plus, eps);
+                stateDiff(m, DyDq->fi, next, next_plus, eps);
             } else {
-                stateDiff(m, DyDq+i*ndx, next_minus, next_plus, 2*eps);
+                stateDiff(m, DyDq->fi, next_minus, next_plus, 2*eps);
             }
         }
 
         // difference sensors
         if (DsDq) {
             if (!flg_centered) {
-                diff(DsDq+i*ns, sensor, sensor_plus, eps, ns);
+                diff(DsDq->fi, sensor, sensor_plus, eps, ns);
             } else {
-                diff(DsDq+i*ns, sensor_minus, sensor_plus, 2*eps, ns);
+                diff(DsDq->fi, sensor_minus, sensor_plus, 2*eps, ns);
             }
         }
     }

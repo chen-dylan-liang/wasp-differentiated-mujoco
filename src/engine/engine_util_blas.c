@@ -900,3 +900,8 @@ void mju_mulMatTMat(mjtNum* res, const mjtNum* mat1, const mjtNum* mat2,
     }
   }
 }
+
+// res += M
+void mju_addToMat(mjtNum* res, const mjtNum* mat, int nr, int nc) {
+  for (int i=0; i < nr; i++) mju_addTo(res+i*nc, mat+i*nc, nc);
+}
