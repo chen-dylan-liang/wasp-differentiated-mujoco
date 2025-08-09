@@ -453,4 +453,6 @@ typedef mjtNum (*mjfAct)(const mjModel* m, const mjData* d, int id);
 typedef int (*mjfCollision)(const mjModel* m, const mjData* d,
                             mjContact* con, int g1, int g2, mjtNum margin);
 
+
+
 #endif  // MUJOCO_MJDATA_H_

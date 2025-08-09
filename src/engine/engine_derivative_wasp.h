@@ -12,16 +12,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-    struct mjWASPCache_{
-        mjtNum* Delta_X;
-        mjtNum* C1;
-        mjtNum* C2;
-        mjtNum* F_hat;
-        mjtNum* fi;
-        size_t i;
-    };
-    typedef struct mjWASPCache_ mjWASPCache;
-
     // wasp differenced transition matrices (control theory notation)
     MJAPI void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
                                   mjtNum* A, mjtNum* B, mjtNum* C, mjtNum* D,

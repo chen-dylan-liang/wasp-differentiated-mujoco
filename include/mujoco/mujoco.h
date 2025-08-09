@@ -1306,6 +1306,22 @@ MJAPI mjtNum mju_sigmoid(mjtNum x);
 MJAPI void mjd_transitionFD(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
                             mjtNum* A, mjtNum* B, mjtNum* C, mjtNum* D);
 
+// wasp differenced transition matrices (control theory notation)
+//   d(x_next) = A*Dx + B*Du
+//   d(sensor) = C*Dx + D*Du
+//   required output matrix dimensions:
+//      nx = nq + nv + na (position + velocity + activation)
+//      A: model Jacobian wrt state, (nx * nx)
+//      B: model Jacobian wrt control, (nx * nu)
+//      C: sensor Jacobian wrt state, (ns * nx)
+//      D: sensor Jacobian wrt control, (nx * nu)
+MJAPI void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
+                        mjtNum* A, mjtNum* B, mjtNum* C, mjtNum* D,
+                        mjWASPCache* DyDq_cache, mjWASPCache* DyDv_cache, mjWASPCache* DyDa_cache,
+                        mjWASPCache* DyDu_cache,
+                        mjWASPCache* DsDq_cache, mjWASPCache* DsDv_cache, mjWASPCache* DsDa_cache,
+                        mjWASPCache* DsDu_cache)
+
 // Finite differenced Jacobians of (force, sensors) = mj_inverse(state, acceleration)
 //   All outputs are optional. Output dimensions (transposed w.r.t Control Theory convention):
 //     DfDq: (nv x nv)

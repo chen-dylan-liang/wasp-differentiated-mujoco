@@ -180,7 +180,6 @@ static void waspUpdate(mjData* d, mjtNum* res, mjWASPCache* cache, int m, int n)
 //      B: model Jacobian wrt control, (nx * nu)
 //      C: sensor Jacobian wrt state, (ns * nx)
 //      D: sensor Jacobian wrt control, (nx * nu)
-
 void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
                         mjtNum* A, mjtNum* B, mjtNum* C, mjtNum* D,
                         mjWASPCache* DyDq_cache, mjWASPCache* DyDv_cache, mjWASPCache* DyDa_cache,
