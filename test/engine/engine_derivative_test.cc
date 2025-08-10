@@ -768,7 +768,8 @@ TEST_F(DerivativeTest, NoStateMutation) {
 
 static void resetWASPCache(mjWASPCache* cache, int n, int m) {
   if (cache) {
-    mju_zero(cache -> Delta_X, n*n); // QR decomposition or SVD to be implemented
+    mju_zero(cache -> Delta_X, n*n);
+    for (int i=0; i < n; i++) {cache->Delta_X[i*n+i] = 1.0;} // QR decomposition or SVD to be implemented
     mju_zero(cache -> C1, n*m*n);
     mju_zero(cache -> C2, n*n);
     mju_zero(cache -> F_hat, m*n);
