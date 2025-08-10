@@ -766,10 +766,24 @@ TEST_F(DerivativeTest, NoStateMutation) {
   mj_deleteModel(model);
 }
 
-static void resetWASPCache(mjWASPCache* cache, int n, int m) {
+static void resetWASPCache(mjWASPCache* cache, int n, int m, bool identity_basis=true) {
   if (cache) {
-    mju_zero(cache -> Delta_X, n*n);
-    for (int i=0; i < n; i++) {cache->Delta_X[i*n+i] = 1.0;} // QR decomposition or SVD to be implemented
+    if (identity_basis) {
+      mju_zero(cache -> Delta_X, n*n);
+      for (int i=0; i < n; i++) {cache->Delta_X[i*n+i] = 1.0;}
+    }
+    else {
+      // make distribution using seed
+      std::mt19937_64 rng;
+      rng.seed(20250810);
+      std::normal_distribution<double> dist(0, 1);
+      mjtNum* M = (mjtNum*)mju_malloc(sizeof(mjtNum)*n*n);
+      for (int i=0; i<n*n;i++) M[i] = dist(rng);
+      mjtNum* R = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
+      mju_qrDecompose(cache->Delta_X, R, M, n,n);
+      mju_free(M);
+      mju_free(R);
+    }
     mju_zero(cache -> C1, n*m*n);
     mju_zero(cache -> C2, n*n);
     mju_zero(cache -> F_hat, m*n);
@@ -778,14 +792,14 @@ static void resetWASPCache(mjWASPCache* cache, int n, int m) {
   }
 }
 
-static mjWASPCache* mj_newWASPCache(int n, int m) {
+static mjWASPCache* mj_newWASPCache(int n, int m, bool identity_basis=true) {
   mjWASPCache* cache  = (mjWASPCache*) mju_malloc(sizeof(mjWASPCache));
   cache -> Delta_X = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
   cache -> C1  = (mjtNum*) mju_malloc(n*m*n*sizeof(mjtNum));
   cache -> C2 = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
   cache -> F_hat = (mjtNum*) mju_malloc(m*n*sizeof(mjtNum));
   cache -> fi = (mjtNum*) mju_malloc(m*sizeof(mjtNum));
-  resetWASPCache(cache, n, m);
+  resetWASPCache(cache, n, m, identity_basis);
   return cache;
 }
 
