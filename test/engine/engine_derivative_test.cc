@@ -777,6 +777,7 @@ static void resetWASPCache(mjWASPCache* cache, int n, int m) {
     cache->i = 0;
   }
 }
+
 static mjWASPCache* mj_newWASPCache(int n, int m) {
   mjWASPCache* cache  = (mjWASPCache*) mju_malloc(sizeof(mjWASPCache));
   cache -> Delta_X = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
@@ -1075,7 +1076,6 @@ TEST_F(DerivativeTest, SensorSkipWASP) {
   mj_deleteWASPCache(DyDu);
   mj_deleteData(data);
   mj_deleteModel(model);
-}
 }
 
 // WASP derivatives don't mutate the state
@@ -1493,6 +1493,5 @@ TEST_F(DerivativeTest, quatIntegrate) {
     }
   }
 }
-
-}  // namespace
-}  // namespace mujoco
+ }  // namespace
+} // namespace mujoco
