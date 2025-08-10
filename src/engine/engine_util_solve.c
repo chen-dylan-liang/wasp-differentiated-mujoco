@@ -1389,3 +1389,50 @@ int mju_boxQPoption(mjtNum* res, mjtNum* R, int* index,               // outputs
   // return nf or -1 if failure
   return (status == mjBOXQP_NO_DESCENT || status == mjBOXQP_NOT_SPD) ? -1 : nfree;
 }
+
+
+// QR decomposition using householder reflections. M = QR where Q is upper triangular and R is orthogonal
+void mju_qrDecompose(mjtNum* Q, mjtNum* R, const mjtNum* M, int nr, int nc) {
+  // copy M to R
+   mju_copy(R, M, nr*nc);
+  // initialize Q to identity
+  for (int i=0; i < nr; i++)
+    for (int j=0; j<nr; j++) Q[i*nc+j]=(i==j)?1:0;
+
+  // main loop
+  int n_iters = nr<=nc ? nr-1 : nc;
+  mjtNum* x = mju_malloc(nr*sizeof(mjtNum));
+  mjtNum* v = mju_malloc(nr*sizeof(mjtNum));
+  for (int k=0; k<n_iters; k++) {
+    // compute the axis of reflection v
+    int sub_rows = nr - k;
+    for (int i=0; i < sub_rows; i++) x[i]=R[(k+i)*nc+k];
+    mjtNum x_norm = mju_norm(x, sub_rows);
+    if (x_norm<1e-10) continue; // already 0
+    mjtNum alpha = (x[0] > 0) ? -x_norm : x_norm;
+    mju_copy(v, x, sub_rows);
+    v[0]-=alpha;
+    mju_normalize(v, sub_rows);
+
+    // apply householder reflection to R
+    // only to update R[k:nr, k:nc]
+    // Qk = I - 2*v*vT
+    // compute R = Qk * R
+    for (int j=k; j<nc; j++) {
+      mjtNum dot = 0.0;
+      for (int i=k; i<nr; i++) dot += v[i-k]*R[i*nc+j];
+      for (int i=k; i<nr; i++) R[i*nc+j] -= 2.0 * dot * v[i-k];
+    }
+
+    // update Q
+    // only to update Q[:, k:nc]
+    // compute Q = Q*Qk
+    for (int i=0; i<nr; i++) {
+      mjtNum dot = 0.0;
+      for (int j=k; j<nr; j++) dot += Q[i*nc+j]*v[j-k];
+      for (int j=k; j<nr; j++) Q[i*nc+j] -= 2.0 * dot * v[j-k];
+    }
+  }
+  mju_free(v);
+  mju_free(x);
+}

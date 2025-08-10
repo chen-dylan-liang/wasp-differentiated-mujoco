@@ -1206,6 +1206,9 @@ MJAPI int mju_boxQP(mjtNum* res, mjtNum* R, int* index, const mjtNum* H, const m
 MJAPI void mju_boxQPmalloc(mjtNum** res, mjtNum** R, int** index, mjtNum** H, mjtNum** g, int n,
                            mjtNum** lower, mjtNum** upper);
 
+// QR decomposition using householder reflections. M = QR where Q is upper triangular and R is orthogonal
+MJAPI void mju_qrDecompose(mjtNum* Q, mjtNum* R, const mjtNum* M, int nr, int nc);
+
 
 //---------------------------------- Miscellaneous -------------------------------------------------
 
