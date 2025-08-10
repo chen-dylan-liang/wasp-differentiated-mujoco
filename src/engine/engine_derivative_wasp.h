@@ -9,9 +9,23 @@
 #include <mujoco/mjexport.h>
 #include <mujoco/mjmodel.h>
 #include "engine_derivative_fd.h"
+#include "engine/engine_util_solve.h"
+#include <stdlib.h>
+#include <time.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+    // reset wasp cache
+    MJAPI void resetWASPCache(mjWASPCache* cache, int n, int m, mjtByte identity_basis);
+
+    // delete wasp cache
+    MJAPI void mj_deleteWASPCache(mjWASPCache* cache);
+
+    // allocate wasp cache
+    MJAPI mjWASPCache* mj_newWASPCache(int n, int m, mjtByte identity_basis);
+
+
     // wasp differenced transition matrices (control theory notation)
     MJAPI void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
                                   mjtNum q_dtheta, mjtNum q_dell, int q_max_n,

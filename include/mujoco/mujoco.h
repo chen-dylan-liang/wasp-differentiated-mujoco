@@ -1328,6 +1328,14 @@ MJAPI void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte f
                         mjWASPCache* DyDu_cache,
                         mjWASPCache* DsDq_cache, mjWASPCache* DsDv_cache, mjWASPCache* DsDa_cache,
                         mjWASPCache* DsDu_cache);
+ // reset wasp cache
+MJAPI void resetWASPCache(mjWASPCache* cache, int n, int m, mjtByte identity_basis);
+
+// delete wasp cache
+MJAPI void mj_deleteWASPCache(mjWASPCache* cache);
+
+// allocate wasp cache
+MJAPI mjWASPCache* mj_newWASPCache(int n, int m, mjtByte identity_basis);
 
 // Finite differenced Jacobians of (force, sensors) = mj_inverse(state, acceleration)
 //   All outputs are optional. Output dimensions (transposed w.r.t Control Theory convention):

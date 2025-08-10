@@ -509,3 +509,58 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
 
     mj_freeStack(d);
 }
+
+// reset wasp cache
+void resetWASPCache(mjWASPCache* cache, int n, int m, mjtByte identity_basis) {
+    if (cache) {
+        if (identity_basis) {
+            mju_zero(cache -> Delta_X, n*n);
+            for (int i=0; i < n; i++) {cache->Delta_X[i*n+i] = 1.0;}
+        }
+        else {
+            // make distribution using seed
+            // Simple replacement for your C++ code
+            srand(20250810);
+            mjtNum* M = (mjtNum*)mju_malloc(sizeof(mjtNum)*n*n);
+            for (int i = 0; i < n*n; i++) {
+                M[i] = (double)rand() / RAND_MAX;  // Random values between 0 and 1
+            }
+            mjtNum* R = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
+            mju_qrDecompose(cache->Delta_X, R, M, n,n);
+            mju_free(M);
+            mju_free(R);
+        }
+        mju_zero(cache -> C1, n*m*n);
+        mju_zero(cache -> C2, n*n);
+        mju_zero(cache -> F_hat, m*n);
+        mju_zero(cache -> fi, m);
+        cache->i = 0;
+    }
+}
+
+// delete wasp cache
+void mj_deleteWASPCache(mjWASPCache* cache) {
+    mju_free(cache->Delta_X);
+    cache -> Delta_X = NULL;
+    mju_free(cache->C1);
+    cache -> C1 = NULL;
+    mju_free(cache->C2);
+    cache -> C2 = NULL;
+    mju_free(cache->F_hat);
+    cache -> F_hat = NULL;
+    mju_free(cache->fi);
+    cache -> fi = NULL;
+    mju_free(cache);
+}
+
+// allocate wasp cache
+mjWASPCache* mj_newWASPCache(int n, int m, mjtByte identity_basis) {
+    mjWASPCache* cache  = (mjWASPCache*) mju_malloc(sizeof(mjWASPCache));
+    cache -> Delta_X = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
+    cache -> C1  = (mjtNum*) mju_malloc(n*m*n*sizeof(mjtNum));
+    cache -> C2 = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
+    cache -> F_hat = (mjtNum*) mju_malloc(m*n*sizeof(mjtNum));
+    cache -> fi = (mjtNum*) mju_malloc(m*sizeof(mjtNum));
+    resetWASPCache(cache, n, m, identity_basis);
+    return cache;
+}
