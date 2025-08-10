@@ -17,7 +17,7 @@
 extern "C" {
 #endif
     // reset wasp cache
-    MJAPI void resetWASPCache(mjWASPCache* cache, int n, int m, mjtByte identity_basis);
+    MJAPI void mj_resetWASPCache(mjWASPCache* cache, int n, int m, mjtByte identity_basis);
 
     // delete wasp cache
     MJAPI void mj_deleteWASPCache(mjWASPCache* cache);
