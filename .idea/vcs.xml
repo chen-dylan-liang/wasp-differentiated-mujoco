@@ -17,6 +17,5 @@
     <mapping directory="$PROJECT_DIR$/cmake-build-debug/_deps/spdlog_lib-src" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/cmake-build-debug/_deps/tinyobjloader-src" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/cmake-build-debug/_deps/tinyxml2-src" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/cmake-build-debug/_deps/trianglemeshdistance-src" vcs="Git" />
   </component>
 </project>
