@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+# find_package(TBB REQUIRED)
 mujoco_test(engine_collision_box_test)
 target_link_libraries(engine_collision_box_test fixture gmock)
 
@@ -32,6 +32,9 @@ target_link_libraries(engine_core_smooth_test fixture gmock absl::span)
 
 mujoco_test(engine_derivative_test)
 target_link_libraries(engine_derivative_test fixture gmock)
+
+mujoco_test(engine_derivative_wasp_test)
+target_link_libraries(engine_derivative_wasp_test fixture gmock)
 
 mujoco_test(engine_forward_test)
 target_link_libraries(engine_forward_test fixture gmock)

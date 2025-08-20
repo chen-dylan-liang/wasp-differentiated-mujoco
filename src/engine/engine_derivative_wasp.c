@@ -511,7 +511,7 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
 }
 
 // reset wasp cache
-void resetWASPCache(mjWASPCache* cache, int n, int m, mjtByte identity_basis) {
+void mj_resetWASPCache(mjWASPCache* cache, int n, int m, mjtByte identity_basis) {
     if (cache) {
         if (identity_basis) {
             mju_zero(cache -> Delta_X, n*n);
@@ -561,6 +561,6 @@ mjWASPCache* mj_newWASPCache(int n, int m, mjtByte identity_basis) {
     cache -> C2 = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
     cache -> F_hat = (mjtNum*) mju_malloc(m*n*sizeof(mjtNum));
     cache -> fi = (mjtNum*) mju_malloc(m*sizeof(mjtNum));
-    resetWASPCache(cache, n, m, identity_basis);
+    mj_resetWASPCache(cache, n, m, identity_basis);
     return cache;
 }

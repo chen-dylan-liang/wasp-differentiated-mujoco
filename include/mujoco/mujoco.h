@@ -1329,7 +1329,7 @@ MJAPI void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte f
                         mjWASPCache* DsDq_cache, mjWASPCache* DsDv_cache, mjWASPCache* DsDa_cache,
                         mjWASPCache* DsDu_cache);
  // reset wasp cache
-MJAPI void resetWASPCache(mjWASPCache* cache, int n, int m, mjtByte identity_basis);
+MJAPI void mj_resetWASPCache(mjWASPCache* cache, int n, int m, mjtByte identity_basis);
 
 // delete wasp cache
 MJAPI void mj_deleteWASPCache(mjWASPCache* cache);
