@@ -437,7 +437,6 @@ void mjd_stepFD(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
       // step, get nudged output
       mj_stepSkip(m, d, mjSTAGE_POS, skipsensor);
       getState(m, d, next_plus, sensor_plus);
-
       // reset
       mj_setState(m, d, fullstate, restore_spec);
 

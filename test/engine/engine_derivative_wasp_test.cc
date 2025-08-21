@@ -433,7 +433,9 @@ TEST_F(DerivativeWASPTest, SensorDerivativesWASP) {
   mjData *data = mj_makeData(model);
 
   // expected analytic C and D
-  mjtNum C[6] = {1, 0, 0, 1, 0, 0};
+  mjtNum C[6] = {1, 0,
+                 0, 1,
+                 0, 0};
 
   mjtNum D[3] = {
       0,
@@ -447,16 +449,31 @@ TEST_F(DerivativeWASPTest, SensorDerivativesWASP) {
   mjtNum *D_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * ns * nu);
   mjWASPCache *DsDq = mj_newWASPCache(nv, ns, use_wasp_identity_basis);
   mjWASPCache *DsDv = mj_newWASPCache(nv, ns, use_wasp_identity_basis);
-  mjWASPCache *DsDa = mj_newWASPCache(model->na, ns, use_wasp_identity_basis);
+  mjWASPCache *DsDa = nullptr;//mj_newWASPCache(model->na, ns, use_wasp_identity_basis);
   mjWASPCache *DsDu = mj_newWASPCache(nu, ns, use_wasp_identity_basis);
 
   mjd_transitionWASP(model, data, eps, /*centered=0*/
-                     1, tol, tol, nv, tol, tol, nv, tol, tol, model->na, tol,
+                     0, tol, tol, nv, tol, tol, nv, tol, tol, model->na, tol,
                      tol, nu, nullptr, nullptr, C_WASP, D_WASP, nullptr,
-                     nullptr, nullptr, nullptr, DsDq, DsDv, DsDa, DsDu);
+                     nullptr, nullptr, nullptr, DsDq, DsDv, nullptr, DsDu);
   // compare expected and actual values
+  // uncomment for debugging:
+
+  //std::cout<<"DsDq:"<<std::endl;
+  //printWASPCache(DsDq, nv, ns, false);
+ // std::cout<<"DsDv:"<<std::endl;
+  //printWASPCache(DsDv, nv, ns, false);
+  //std::cout<<"C_wasp:"<<std::endl;
+  //PrintMatrix(C_WASP, ns, 2*nv);
+  //std::cout<<"DsDu:"<<std::endl;
+ // printWASPCache(DsDu, nu, ns, true);
+  //std::cout<<"D_wasp:"<<std::endl;
+ // PrintMatrix(D_WASP, ns, nu);
+
   CompareMatrices(C_WASP, C, ns, 2 * nv, eps);
+  std::cout<<"Finished comparing results for C."<<std::endl;
   CompareMatrices(D_WASP, D, ns, nu, eps);
+  std::cout<<"Finished comparing results for D."<<std::endl;
 
   mju_free(D_WASP);
   mju_free(C_WASP);

@@ -640,7 +640,7 @@ TEST_F(DerivativeTest, SensorDerivatives) {
   mjModel* model = LoadModelFromString(xml);
   int nv = model->nv, nu = model->nu, ns = model->nsensordata;
   mjData* data = mj_makeData(model);
-
+ // std::cout<<"na="<<model->na<<std::endl;
   // finite differenced C and D
   mjtNum eps = 1e-6;
   mjtNum* CFD = (mjtNum*) mju_malloc(sizeof(mjtNum)*ns*2*nv);
