@@ -126,6 +126,36 @@ static mjtNum CompareMatrices(mjtNum *Actual, mjtNum *Expected, int nrow,
   }
   return max_error;
 }
+
+  // utility function for matrix printing (debug)
+  // NOLINTNEXTLINE(clang-diagnostic-unused-function)
+  static void PrintMatrix(mjtNum* mat, int nrow, int ncol) {
+  std::cerr.precision(5);
+  std::cerr << "\n";
+  for (int r=0; r < nrow; r++) {
+    for (int c=0; c < ncol; c++) {
+      std::cerr << std::fixed << std::setw(9) << mat[c + r*ncol] << " ";
+    }
+    std::cerr << "\n";
+  }
+}
+
+// used for debugging cache
+void printWASPCache(mjWASPCache* cache, int n, int m) {
+  std::cout<<"Delta_X:"<<std::endl;
+  PrintMatrix(cache->Delta_X,n,n);
+  for (int i=0; i<n; i++) {
+    std::cout<<"C1["<<i<<"]:"<<std::endl;
+    PrintMatrix(cache->C1+i*m*n, m, n);
+  }
+  std::cout<<"C2:"<<std::endl;
+  PrintMatrix(cache->C2,n,n);
+  std::cout<<"F_hat:"<<std::endl;
+  PrintMatrix(cache->F_hat,m,n);
+  std::cout<<"fi:"<<std::endl;
+  PrintMatrix(cache->fi,m,1);
+}
+
 // compare WASP derivatives to analytic derivatives of linear dynamical system
 TEST_F(DerivativeWASPTest, LinearSystemWASP) {
   const std::string xml_path = GetTestDataFilePath(kLinearPath);
