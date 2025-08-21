@@ -146,7 +146,7 @@ void printWASPCache(mjWASPCache* cache, int n, int m) {
   PrintMatrix(cache->Delta_X,n,n);
   for (int i=0; i<n; i++) {
     std::cout<<"C1["<<i<<"]:"<<std::endl;
-    PrintMatrix(cache->C1+i*m*n, m, n);
+    PrintMatrix(cache->C1+i*n*n, n, n);
   }
   std::cout<<"C2:"<<std::endl;
   PrintMatrix(cache->C2,n,n);
@@ -154,6 +154,77 @@ void printWASPCache(mjWASPCache* cache, int n, int m) {
   PrintMatrix(cache->F_hat,m,n);
   std::cout<<"fi:"<<std::endl;
   PrintMatrix(cache->fi,m,1);
+}
+
+// WASP derivatives don't mutate the state
+TEST_F(DerivativeWASPTest, NoStateMutationWASP) {
+  const std::string xml_path = GetTestDataFilePath(kModelPath);
+  mjModel *model = mj_loadXML(xml_path.c_str(), nullptr, nullptr, 0);
+  ASSERT_THAT(model, NotNull());
+  mjData *data0 = mj_makeData(model);
+  mjData *data = mj_makeData(model);
+  int nv = model->nv, nu = model->nu, na = model->na, ns = model->nsensordata;
+
+  // set time
+  data->time = data0->time = 0.5;
+
+  for (int i = 0; i < nv; i++) {
+    data->qpos[i] = data0->qpos[i] = (mjtNum)i + 1;
+    data->qvel[i] = data0->qvel[i] = (mjtNum)i + 2;
+  }
+
+  // set ctrl
+  for (int i = 0; i < nu; i++) {
+    data->ctrl[i] = data0->ctrl[i] = (mjtNum)i + 1;
+  }
+
+  // set act
+  for (int i = 0; i < na; i++) {
+    data->act[i] = data0->act[i] = (mjtNum)i + 1;
+  }
+
+  // allocate Jacobians, call derivatives
+  int ndx = nv + nv + na;
+  mjtNum *A = (mjtNum *)mju_malloc(sizeof(mjtNum) * ndx * ndx);
+  mjtNum *B = (mjtNum *)mju_malloc(sizeof(mjtNum) * ndx * nu);
+  mjtNum *C = (mjtNum *)mju_malloc(sizeof(mjtNum) * ns * ndx);
+  mjtNum *D = (mjtNum *)mju_malloc(sizeof(mjtNum) * ns * nu);
+  mjWASPCache *DyDq = mj_newWASPCache(nv, ndx, use_wasp_identity_basis);
+  mjWASPCache *DyDv = mj_newWASPCache(nv, ndx, use_wasp_identity_basis);
+  mjWASPCache *DyDa = mj_newWASPCache(na, ndx, use_wasp_identity_basis);
+  mjWASPCache *DyDu = mj_newWASPCache(nu, ndx, use_wasp_identity_basis);
+  mjWASPCache *DsDq = mj_newWASPCache(nv, ns, use_wasp_identity_basis);
+  mjWASPCache *DsDv = mj_newWASPCache(nv, ns, use_wasp_identity_basis);
+  mjWASPCache *DsDa = mj_newWASPCache(na, ns, use_wasp_identity_basis);
+  mjWASPCache *DsDu = mj_newWASPCache(nu, ns, use_wasp_identity_basis);
+  mjtNum eps = 1e-6, tol = 1e-10;
+  mjd_transitionWASP(model, data, eps, /*centered=0*/
+                     0, tol, tol, nv, tol, tol, nv, tol, tol, na, tol, tol, nu,
+                     A, B, C, D, DyDq, DyDv, DyDa, DyDu, DsDq, DsDv, DsDa,
+                     DsDu);
+
+  // compare states in data and data0
+  EXPECT_EQ(data->time, data0->time);
+  EXPECT_EQ(AsVector(data->qpos, model->nq), AsVector(data0->qpos, model->nq));
+  EXPECT_EQ(AsVector(data->qvel, nv), AsVector(data0->qvel, nv));
+  EXPECT_EQ(AsVector(data->act, na), AsVector(data0->act, na));
+  EXPECT_EQ(AsVector(data->ctrl, nu), AsVector(data0->ctrl, nu));
+
+  mju_free(D);
+  mju_free(C);
+  mju_free(B);
+  mju_free(A);
+  mj_deleteWASPCache(DyDu);
+  mj_deleteWASPCache(DyDa);
+  mj_deleteWASPCache(DyDv);
+  mj_deleteWASPCache(DyDq);
+  mj_deleteWASPCache(DsDu);
+  mj_deleteWASPCache(DsDa);
+  mj_deleteWASPCache(DsDv);
+  mj_deleteWASPCache(DsDq);
+  mj_deleteData(data);
+  mj_deleteData(data0);
+  mj_deleteModel(model);
 }
 
 // compare WASP derivatives to analytic derivatives of linear dynamical system
@@ -411,75 +482,5 @@ TEST_F(DerivativeWASPTest, SensorSkipWASP) {
   mj_deleteModel(model);
 }
 
-// WASP derivatives don't mutate the state
-TEST_F(DerivativeWASPTest, NoStateMutationWASP) {
-  const std::string xml_path = GetTestDataFilePath(kModelPath);
-  mjModel *model = mj_loadXML(xml_path.c_str(), nullptr, nullptr, 0);
-  ASSERT_THAT(model, NotNull());
-  mjData *data0 = mj_makeData(model);
-  mjData *data = mj_makeData(model);
-  int nv = model->nv, nu = model->nu, na = model->na, ns = model->nsensordata;
-
-  // set time
-  data->time = data0->time = 0.5;
-
-  for (int i = 0; i < nv; i++) {
-    data->qpos[i] = data0->qpos[i] = (mjtNum)i + 1;
-    data->qvel[i] = data0->qvel[i] = (mjtNum)i + 2;
-  }
-
-  // set ctrl
-  for (int i = 0; i < nu; i++) {
-    data->ctrl[i] = data0->ctrl[i] = (mjtNum)i + 1;
-  }
-
-  // set act
-  for (int i = 0; i < na; i++) {
-    data->act[i] = data0->act[i] = (mjtNum)i + 1;
-  }
-
-  // allocate Jacobians, call derivatives
-  int ndx = nv + nv + na;
-  mjtNum *A = (mjtNum *)mju_malloc(sizeof(mjtNum) * ndx * ndx);
-  mjtNum *B = (mjtNum *)mju_malloc(sizeof(mjtNum) * ndx * nu);
-  mjtNum *C = (mjtNum *)mju_malloc(sizeof(mjtNum) * ns * ndx);
-  mjtNum *D = (mjtNum *)mju_malloc(sizeof(mjtNum) * ns * nu);
-  mjWASPCache *DyDq = mj_newWASPCache(nv, ndx, use_wasp_identity_basis);
-  mjWASPCache *DyDv = mj_newWASPCache(nv, ndx, use_wasp_identity_basis);
-  mjWASPCache *DyDa = mj_newWASPCache(na, ndx, use_wasp_identity_basis);
-  mjWASPCache *DyDu = mj_newWASPCache(nu, ndx, use_wasp_identity_basis);
-  mjWASPCache *DsDq = mj_newWASPCache(nv, ns, use_wasp_identity_basis);
-  mjWASPCache *DsDv = mj_newWASPCache(nv, ns, use_wasp_identity_basis);
-  mjWASPCache *DsDa = mj_newWASPCache(na, ns, use_wasp_identity_basis);
-  mjWASPCache *DsDu = mj_newWASPCache(nu, ns, use_wasp_identity_basis);
-  mjtNum eps = 1e-6, tol = 1e-10;
-  mjd_transitionWASP(model, data, eps, /*centered=0*/
-                     0, tol, tol, nv, tol, tol, nv, tol, tol, na, tol, tol, nu,
-                     A, B, C, D, DyDq, DyDv, DyDa, DyDu, DsDq, DsDv, DsDa,
-                     DsDu);
-
-  // compare states in data and data0
-  EXPECT_EQ(data->time, data0->time);
-  EXPECT_EQ(AsVector(data->qpos, model->nq), AsVector(data0->qpos, model->nq));
-  EXPECT_EQ(AsVector(data->qvel, nv), AsVector(data0->qvel, nv));
-  EXPECT_EQ(AsVector(data->act, na), AsVector(data0->act, na));
-  EXPECT_EQ(AsVector(data->ctrl, nu), AsVector(data0->ctrl, nu));
-
-  mju_free(D);
-  mju_free(C);
-  mju_free(B);
-  mju_free(A);
-  mj_deleteWASPCache(DyDu);
-  mj_deleteWASPCache(DyDa);
-  mj_deleteWASPCache(DyDv);
-  mj_deleteWASPCache(DyDq);
-  mj_deleteWASPCache(DsDu);
-  mj_deleteWASPCache(DsDa);
-  mj_deleteWASPCache(DsDv);
-  mj_deleteWASPCache(DsDq);
-  mj_deleteData(data);
-  mj_deleteData(data0);
-  mj_deleteModel(model);
-}
 } // namespace
 } // namespace mujoco

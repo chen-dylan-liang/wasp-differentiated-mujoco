@@ -117,8 +117,8 @@ static void waspUpdate(mjData* d, mjtNum* res, mjWASPCache* cache, int m, int n)
     mjtNum* tmp =  mj_stackAllocNum(d, m*n);
     mju_mulMatMatT(res, cache->F_hat, (cache->C1)+i*n*n, m, n, n);
     mju_mulMatMatT(tmp, cache->fi, (cache->C2)+i*n, m, 1, n);
-    mju_addToMat(res, tmp, m, m);
-    mju_mulMatMat(cache->F_hat, res, cache->Delta_X, n, n, n);
+    mju_addToMat(res, tmp, m, n);
+    mju_mulMatMat(cache->F_hat, res, cache->Delta_X, m, n, n);
     cache->i = (i+1)%n;
 }
 
@@ -179,7 +179,7 @@ static void mjd_stepWASPDu(const mjModel* m,
 
         // difference sensors
         if (s_cache) {
-            mju_copy(s_fi, s_cache->fi, 2*m->nsensordata);
+            mju_copy(s_fi, s_cache->fi, m->nsensordata);
             clampedDiff(s_cache->fi, sensor, nudge_fwd ? sensor_plus : NULL,
                         nudge_back ? sensor_minus : NULL, eps,  m->nsensordata);
             waspUpdate(d, s_res, s_cache, m->nsensordata, m->nu);
@@ -241,7 +241,7 @@ static void mjd_stepWASPDv(const mjModel* m,
 
     // difference sensors
     if (s_cache) {
-        mju_copy(s_fi, s_cache->fi, 2*m->nsensordata);
+        mju_copy(s_fi, s_cache->fi, m->nsensordata);
         if (!flg_centered) {
             diff(s_cache->fi, sensor, sensor_plus, eps, m->nsensordata);
         } else {
@@ -307,7 +307,7 @@ static void mjd_stepWASPDa(const mjModel* m,
 
     // difference sensors
     if (s_cache) {
-        mju_copy(s_fi, s_cache->fi, 2*m->nsensordata);
+        mju_copy(s_fi, s_cache->fi, m->nsensordata);
         if (!flg_centered) {
             diff(s_cache->fi, sensor, sensor_plus, eps, m->nsensordata);
         } else {
@@ -379,7 +379,7 @@ static void mjd_stepWASPDq(const mjModel* m,
 
     // difference sensors
     if (s_cache) {
-        mju_copy(s_fi, s_cache->fi, 2*m->nsensordata);
+        mju_copy(s_fi, s_cache->fi, m->nsensordata);
         if (!flg_centered) {
             diff(s_cache->fi, sensor, sensor_plus, eps, m->nsensordata);
         } else {
