@@ -129,7 +129,7 @@ static mjtNum CompareMatrices(mjtNum *Actual, mjtNum *Expected, int nrow,
 
   // utility function for matrix printing (debug)
   // NOLINTNEXTLINE(clang-diagnostic-unused-function)
-  static void PrintMatrix(mjtNum* mat, int nrow, int ncol) {
+  static void PrintMatrix(const mjtNum* mat, int nrow, int ncol) {
   std::cout.precision(5);
   std::cout << "\n";
   for (int r=0; r < nrow; r++) {
@@ -141,15 +141,17 @@ static mjtNum CompareMatrices(mjtNum *Actual, mjtNum *Expected, int nrow,
 }
 
 // used for debugging cache
-void printWASPCache(mjWASPCache* cache, int n, int m) {
-  std::cout<<"Delta_X:"<<std::endl;
-  PrintMatrix(cache->Delta_X,n,n);
-  for (int i=0; i<n; i++) {
-    std::cout<<"C1["<<i<<"]:"<<std::endl;
-    PrintMatrix(cache->C1+i*n*n, n, n);
+void printWASPCache(const mjWASPCache* cache, int n, int m, bool print_x) {
+  if (print_x) {
+    std::cout<<"Delta_X:"<<std::endl;
+    PrintMatrix(cache->Delta_X,n,n);
+    for (int i=0; i<n; i++) {
+      std::cout<<"C1["<<i<<"]:"<<std::endl;
+      PrintMatrix(cache->C1+i*n*n, n, n);
+    }
+    std::cout<<"C2:"<<std::endl;
+    PrintMatrix(cache->C2,n,n);
   }
-  std::cout<<"C2:"<<std::endl;
-  PrintMatrix(cache->C2,n,n);
   std::cout<<"F_hat:"<<std::endl;
   PrintMatrix(cache->F_hat,m,n);
   std::cout<<"fi:"<<std::endl;
@@ -248,7 +250,9 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
   LinearSystem(model, data, A, B);
 
   // uncomment for debugging:
-  // PrintMatrix(A, 2*nv, 2*nv);
+  //std::cout<<"A:"<<std::endl;
+ //  PrintMatrix(A, 2*nv, 2*nv);
+  //std::cout<<"B:"<<std::endl;
   // PrintMatrix(B, 2*nv, nu);
 
   // forward differenced A and B
@@ -258,15 +262,26 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
   mjWASPCache *DyDq = mj_newWASPCache(nv, 2 * nv, use_wasp_identity_basis);
   mjWASPCache *DyDv = mj_newWASPCache(nv, 2 * nv, use_wasp_identity_basis);
   mjWASPCache *DyDu = mj_newWASPCache(nu, 2 * nv, use_wasp_identity_basis);
-  printWASPCache(DyDq, nv, 2*nv);
-
+  // printWASPCache(DyDq, nv, 2*nv,true);
   mjd_transitionWASP(model, data, eps, /*centered=0*/
                      0, tol, tol, nv, tol, tol, nv, 0, 0, 0, tol, tol, nu,
                      A_WASP, B_WASP, nullptr, nullptr, DyDq, DyDv, nullptr,
                      DyDu, nullptr, nullptr, nullptr, nullptr);
-
+  // uncomment for debugging:
+  //std::cout<<"DyDq:"<<std::endl;
+  //printWASPCache(DyDq, nv, 2*nv, false);
+ // std::cout<<"DyDv:"<<std::endl;
+ // printWASPCache(DyDv, nv, 2*nv, false);
+  //std::cout<<"A_wasp:"<<std::endl;
+  //PrintMatrix(A_WASP, 2*nv, 2*nv);
+  //std::cout<<"DyDu:"<<std::endl;
+  //printWASPCache(DyDu, nu, 2*nv, false);
+  //std::cout<<"B_wasp:"<<std::endl;
+  //PrintMatrix(B_WASP, 2*nv, nu);
   CompareMatrices(A, A_WASP, 2 * nv, 2 * nv, tol);
+  std::cout<<"Finished comparing results for A."<<std::endl;
   CompareMatrices(B, B_WASP, 2 * nv, nu, tol);
+  std::cout<<"Finished comparing results for B."<<std::endl;
 
   // central differenced A and B
   mjtNum *A_WASPc = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * 2 * nv);
@@ -275,13 +290,28 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
   mjWASPCache *DyDvc = mj_newWASPCache(nv, 2 * nv, use_wasp_identity_basis);
   mjWASPCache *DyDuc = mj_newWASPCache(nu, 2 * nv, use_wasp_identity_basis);
 
-  mjd_transitionWASP(model, data, eps, /*centered=0*/
+  mjd_transitionWASP(model, data, eps, /*centered=1*/
                      1, tol, tol, nv, tol, tol, nv, 0, 0, 0, tol, tol, nu,
                      A_WASPc, B_WASPc, nullptr, nullptr, DyDqc, DyDvc, nullptr,
                      DyDuc, nullptr, nullptr, nullptr, nullptr);
 
+  // uncomment for debugging:
+  /*
+  std::cout<<"DyDqc:"<<std::endl;
+  printWASPCache(DyDqc, nv, 2*nv, true);
+  std::cout<<"DyDvc:"<<std::endl;
+  printWASPCache(DyDvc, nv, 2*nv, true);
+  std::cout<<"A_waspc:"<<std::endl;
+  PrintMatrix(A_WASPc, 2*nv, 2*nv);
+  std::cout<<"DyDuc:"<<std::endl;
+  printWASPCache(DyDuc, nu, 2*nv, true);
+  std::cout<<"B_wasp:"<<std::endl;
+  PrintMatrix(B_WASPc, 2*nv, nu);
+*/
   CompareMatrices(A_WASP, A_WASPc, 2 * nv, 2 * nv, tol);
+  std::cout<<"Finished comparing results for A central."<<std::endl;
   CompareMatrices(B_WASP, B_WASPc, 2 * nv, nu, tol);
+  std::cout<<"Finished comparing results for B central."<<std::endl;
 
   mju_free(B_WASPc);
   mju_free(A_WASPc);
