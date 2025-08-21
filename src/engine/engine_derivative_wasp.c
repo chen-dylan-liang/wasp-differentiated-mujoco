@@ -116,7 +116,7 @@ static void waspUpdate(mjData* d, mjtNum* res, mjWASPCache* cache, int m, int n)
     size_t i = cache->i;
     mjtNum* tmp =  mj_stackAllocNum(d, m*n);
     mju_mulMatMatT(res, cache->F_hat, (cache->C1)+i*n*n, m, n, n);
-    mju_mulMatMatT(tmp, cache->fi, (cache->C2)+i, m, 1, n);
+    mju_mulMatMatT(tmp, cache->fi, (cache->C2)+i*n, m, 1, n);
     mju_addToMat(res, tmp, m, m);
     mju_mulMatMat(cache->F_hat, res, cache->Delta_X, n, n, n);
     cache->i = (i+1)%n;
@@ -530,8 +530,19 @@ void mj_resetWASPCache(mjWASPCache* cache, int n, int m, mjtByte identity_basis)
             mju_free(M);
             mju_free(R);
         }
-        mju_zero(cache -> C1, n*m*n);
-        mju_zero(cache -> C2, n*n);
+        mju_zero(cache -> C1, n*n*n);
+        mju_transpose(cache->C2, cache->Delta_X,n,n);
+        mjtNum* tmp = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
+        mjtNum* I = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
+        mju_transpose(cache->C2, cache->Delta_X,n,n);
+        for (int i=0; i<n; i++) {
+          mju_mulMatMatT(tmp, cache->C2+i*n, cache->C2+i*n, n,1,n);
+          for (int j=0; j<n; j++) {I[j*n+j]=1;} // set to identity
+          mju_subFrom(I, tmp, n*n);
+          mju_mulMatMat(cache->C1+i*n*n, I, cache->Delta_X, n, n,n);
+        }
+        mju_free(tmp);
+        mju_free(I);
         mju_zero(cache -> F_hat, m*n);
         mju_zero(cache -> fi, m);
         cache->i = 0;
@@ -557,7 +568,7 @@ void mj_deleteWASPCache(mjWASPCache* cache) {
 mjWASPCache* mj_newWASPCache(int n, int m, mjtByte identity_basis) {
     mjWASPCache* cache  = (mjWASPCache*) mju_malloc(sizeof(mjWASPCache));
     cache -> Delta_X = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
-    cache -> C1  = (mjtNum*) mju_malloc(n*m*n*sizeof(mjtNum));
+    cache -> C1  = (mjtNum*) mju_malloc(n*n*n*sizeof(mjtNum));
     cache -> C2 = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
     cache -> F_hat = (mjtNum*) mju_malloc(m*n*sizeof(mjtNum));
     cache -> fi = (mjtNum*) mju_malloc(m*sizeof(mjtNum));

@@ -130,13 +130,13 @@ static mjtNum CompareMatrices(mjtNum *Actual, mjtNum *Expected, int nrow,
   // utility function for matrix printing (debug)
   // NOLINTNEXTLINE(clang-diagnostic-unused-function)
   static void PrintMatrix(mjtNum* mat, int nrow, int ncol) {
-  std::cerr.precision(5);
-  std::cerr << "\n";
+  std::cout.precision(5);
+  std::cout << "\n";
   for (int r=0; r < nrow; r++) {
     for (int c=0; c < ncol; c++) {
-      std::cerr << std::fixed << std::setw(9) << mat[c + r*ncol] << " ";
+      std::cout << std::fixed << std::setw(9) << mat[c + r*ncol] << " ";
     }
-    std::cerr << "\n";
+    std::cout << "\n";
   }
 }
 
@@ -187,6 +187,7 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
   mjWASPCache *DyDq = mj_newWASPCache(nv, 2 * nv, use_wasp_identity_basis);
   mjWASPCache *DyDv = mj_newWASPCache(nv, 2 * nv, use_wasp_identity_basis);
   mjWASPCache *DyDu = mj_newWASPCache(nu, 2 * nv, use_wasp_identity_basis);
+  printWASPCache(DyDq, nv, 2*nv);
 
   mjd_transitionWASP(model, data, eps, /*centered=0*/
                      0, tol, tol, nv, tol, tol, nv, 0, 0, 0, tol, tol, nu,
