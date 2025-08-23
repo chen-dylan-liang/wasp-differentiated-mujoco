@@ -168,25 +168,24 @@ TEST_F(DerivativeWASPTest, QRDecomposition) {
   mju_mulMatMatT(res,cache1->Delta_X,cache1->Delta_X,n,n,n);
   mju_zero(identity, n*n);
   for (int i=0; i<n; i++) identity[i*n+i] = 1;
-  PrintMatrix(res,n,n);
+  //PrintMatrix(res,n,n);
   CompareMatrices(res, identity,n,n, tol);
   std::cout<<"Finished testing n="<<n<<", m="<<m<<" for QR decomposition."<<std::endl;
   // n > m
   m=50;
   mjWASPCache* cache2 = mj_newWASPCache(n,m,0);
-  mju_mulMatMatT(res,cache2->Delta_X,cache1->Delta_X,n,n,n);
+  mju_mulMatMatT(res,cache2->Delta_X,cache2->Delta_X,n,n,n);
   mju_zero(identity, n*n);
   for (int i=0; i<n; i++) identity[i*n+i] = 1;
-  PrintMatrix(res,n,n);
+ // PrintMatrix(res,n,n);
   CompareMatrices(res, identity,n,n, tol);
   std::cout<<"Finished testing n="<<n<<", m="<<m<<" for QR decomposition."<<std::endl;
   // n < m
   n=25;
   mjWASPCache* cache3 = mj_newWASPCache(n,m,0);
-  mju_mulMatMatT(res,cache3->Delta_X,cache1->Delta_X,n,n,n);
+  mju_mulMatMatT(res,cache3->Delta_X,cache3->Delta_X,n,n,n);
   mju_zero(identity, n*n);
   for (int i=0; i<n; i++) identity[i*n+i] = 1;
-  PrintMatrix(res,n,n);
   CompareMatrices(res, identity,n,n, tol);
   std::cout<<"Finished testing n="<<n<<", m="<<m<<" for QR decomposition."<<std::endl;
 }
