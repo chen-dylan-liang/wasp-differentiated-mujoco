@@ -33,7 +33,7 @@ using ::testing::Eq;
 using ::testing::NotNull;
 using ::testing::Pointwise;
 using DerivativeWASPTest = MujocoTest;
-static const mjtByte use_wasp_identity_basis = 1;
+static const mjtByte use_wasp_identity_basis = 0;
 
 // Analytic transition matrices for linear dynamical system xn = A*x + B*u
 //   given modified mass matrix H (`data->qH`) and
@@ -157,6 +157,40 @@ void printWASPCache(const mjWASPCache* cache, int n, int m, bool print_x) {
   std::cout<<"fi:"<<std::endl;
   PrintMatrix(cache->fi,m,1);
 }
+// Test QR decomposition for WASP Cache
+TEST_F(DerivativeWASPTest, QRDecomposition) {
+  // n = m
+  mjtNum tol = 1e-10;
+  int n=100, m=100;
+  mjWASPCache* cache1 = mj_newWASPCache(n,m,0);
+  mjtNum* res = (mjtNum*)mju_malloc(sizeof(mjtNum)*n*n);
+  mjtNum* identity = (mjtNum*)mju_malloc(sizeof(mjtNum)*n*n);
+  mju_mulMatMatT(res,cache1->Delta_X,cache1->Delta_X,n,n,n);
+  mju_zero(identity, n*n);
+  for (int i=0; i<n; i++) identity[i*n+i] = 1;
+  PrintMatrix(res,n,n);
+  CompareMatrices(res, identity,n,n, tol);
+  std::cout<<"Finished testing n="<<n<<", m="<<m<<" for QR decomposition."<<std::endl;
+  // n > m
+  m=50;
+  mjWASPCache* cache2 = mj_newWASPCache(n,m,0);
+  mju_mulMatMatT(res,cache2->Delta_X,cache1->Delta_X,n,n,n);
+  mju_zero(identity, n*n);
+  for (int i=0; i<n; i++) identity[i*n+i] = 1;
+  PrintMatrix(res,n,n);
+  CompareMatrices(res, identity,n,n, tol);
+  std::cout<<"Finished testing n="<<n<<", m="<<m<<" for QR decomposition."<<std::endl;
+  // n < m
+  n=25;
+  mjWASPCache* cache3 = mj_newWASPCache(n,m,0);
+  mju_mulMatMatT(res,cache3->Delta_X,cache1->Delta_X,n,n,n);
+  mju_zero(identity, n*n);
+  for (int i=0; i<n; i++) identity[i*n+i] = 1;
+  PrintMatrix(res,n,n);
+  CompareMatrices(res, identity,n,n, tol);
+  std::cout<<"Finished testing n="<<n<<", m="<<m<<" for QR decomposition."<<std::endl;
+}
+
 
 // WASP derivatives don't mutate the state
 TEST_F(DerivativeWASPTest, NoStateMutationWASP) {
