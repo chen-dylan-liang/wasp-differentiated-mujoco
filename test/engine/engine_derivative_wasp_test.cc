@@ -162,7 +162,7 @@ TEST_F(DerivativeWASPTest, QRDecomposition) {
   // n = m
   mjtNum tol = 1e-10;
   int n=100, m=100;
-  mjWASPCache* cache1 = mj_newWASPCache(n,m,0);
+  mjWASPCache* cache1 = mj_newWASPCache(n,m,1, 0);
   mjtNum* res = (mjtNum*)mju_malloc(sizeof(mjtNum)*n*n);
   mjtNum* identity = (mjtNum*)mju_malloc(sizeof(mjtNum)*n*n);
   mju_mulMatMatT(res,cache1->Delta_X,cache1->Delta_X,n,n,n);
@@ -173,7 +173,7 @@ TEST_F(DerivativeWASPTest, QRDecomposition) {
   std::cout<<"Finished testing n="<<n<<", m="<<m<<" for QR decomposition."<<std::endl;
   // n > m
   m=50;
-  mjWASPCache* cache2 = mj_newWASPCache(n,m,0);
+  mjWASPCache* cache2 = mj_newWASPCache(n,m,1, 0);
   mju_mulMatMatT(res,cache2->Delta_X,cache2->Delta_X,n,n,n);
   mju_zero(identity, n*n);
   for (int i=0; i<n; i++) identity[i*n+i] = 1;
@@ -182,7 +182,7 @@ TEST_F(DerivativeWASPTest, QRDecomposition) {
   std::cout<<"Finished testing n="<<n<<", m="<<m<<" for QR decomposition."<<std::endl;
   // n < m
   n=25;
-  mjWASPCache* cache3 = mj_newWASPCache(n,m,0);
+  mjWASPCache* cache3 = mj_newWASPCache(n,m,1, 0);
   mju_mulMatMatT(res,cache3->Delta_X,cache3->Delta_X,n,n,n);
   mju_zero(identity, n*n);
   for (int i=0; i<n; i++) identity[i*n+i] = 1;
@@ -224,14 +224,18 @@ TEST_F(DerivativeWASPTest, NoStateMutationWASP) {
   mjtNum *B = (mjtNum *)mju_malloc(sizeof(mjtNum) * ndx * nu);
   mjtNum *C = (mjtNum *)mju_malloc(sizeof(mjtNum) * ns * ndx);
   mjtNum *D = (mjtNum *)mju_malloc(sizeof(mjtNum) * ns * nu);
-  mjWASPCache *DyDq = mj_newWASPCache(nv, ndx, use_wasp_identity_basis);
-  mjWASPCache *DyDv = mj_newWASPCache(nv, ndx, use_wasp_identity_basis);
-  mjWASPCache *DyDa = mj_newWASPCache(na, ndx, use_wasp_identity_basis);
-  mjWASPCache *DyDu = mj_newWASPCache(nu, ndx, use_wasp_identity_basis);
-  mjWASPCache *DsDq = mj_newWASPCache(nv, ns, use_wasp_identity_basis);
-  mjWASPCache *DsDv = mj_newWASPCache(nv, ns, use_wasp_identity_basis);
-  mjWASPCache *DsDa = mj_newWASPCache(na, ns, use_wasp_identity_basis);
-  mjWASPCache *DsDu = mj_newWASPCache(nu, ns, use_wasp_identity_basis);
+  mjWASPCache *DyDq = mj_newWASPCache(nv, ndx, 1, use_wasp_identity_basis);
+  mjWASPCache *DyDv = mj_newWASPCache(nv, ndx, 1, use_wasp_identity_basis);
+  mjWASPCache *DyDa = mj_newWASPCache(na, ndx, 1, use_wasp_identity_basis);
+  mjWASPCache *DyDu = mj_newWASPCache(nu, ndx, 1, use_wasp_identity_basis);
+  mjWASPCache *DsDq = mj_newWASPCache(nv, ns, 0, use_wasp_identity_basis);
+  mjWASPCache *DsDv = mj_newWASPCache(nv, ns, 0, use_wasp_identity_basis);
+  mjWASPCache *DsDa = mj_newWASPCache(na, ns, 0, use_wasp_identity_basis);
+  mjWASPCache *DsDu = mj_newWASPCache(nu, ns, 0, use_wasp_identity_basis);
+  mj_copyWASPCache(DyDq, DsDq, nv, 0);
+  mj_copyWASPCache(DyDv, DsDv, nv, 0);
+  mj_copyWASPCache(DyDa, DsDa, na, 0);
+  mj_copyWASPCache(DyDu, DsDu, nu, 0);
   mjtNum eps = 1e-6, tol = 1e-10;
   mjd_transitionWASP(model, data, eps, /*centered=0*/
                      0, tol, tol, nv, tol, tol, nv, tol, tol, na, tol, tol, nu,
@@ -292,9 +296,9 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
   mjtNum eps = 1e-6, tol = 1e-10;
   mjtNum *A_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * 2 * nv);
   mjtNum *B_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * nu);
-  mjWASPCache *DyDq = mj_newWASPCache(nv, 2 * nv, use_wasp_identity_basis);
-  mjWASPCache *DyDv = mj_newWASPCache(nv, 2 * nv, use_wasp_identity_basis);
-  mjWASPCache *DyDu = mj_newWASPCache(nu, 2 * nv, use_wasp_identity_basis);
+  mjWASPCache *DyDq = mj_newWASPCache(nv, 2 * nv, 1,use_wasp_identity_basis);
+  mjWASPCache *DyDv = mj_newWASPCache(nv, 2 * nv, 1,use_wasp_identity_basis);
+  mjWASPCache *DyDu = mj_newWASPCache(nu, 2 * nv, 1, use_wasp_identity_basis);
   // printWASPCache(DyDq, nv, 2*nv,true);
   mjd_transitionWASP(model, data, eps, /*centered=0*/
                      0, tol, tol, nv, tol, tol, nv, 0, 0, 0, tol, tol, nu,
@@ -319,9 +323,9 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
   // central differenced A and B
   mjtNum *A_WASPc = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * 2 * nv);
   mjtNum *B_WASPc = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * nu);
-  mjWASPCache *DyDqc = mj_newWASPCache(nv, 2 * nv, use_wasp_identity_basis);
-  mjWASPCache *DyDvc = mj_newWASPCache(nv, 2 * nv, use_wasp_identity_basis);
-  mjWASPCache *DyDuc = mj_newWASPCache(nu, 2 * nv, use_wasp_identity_basis);
+  mjWASPCache *DyDqc = mj_newWASPCache(nv, 2 * nv, 1, use_wasp_identity_basis);
+  mjWASPCache *DyDvc = mj_newWASPCache(nv, 2 * nv, 1, use_wasp_identity_basis);
+  mjWASPCache *DyDuc = mj_newWASPCache(nu, 2 * nv, 1, use_wasp_identity_basis);
 
   mjd_transitionWASP(model, data, eps, /*centered=1*/
                      1, tol, tol, nv, tol, tol, nv, 0, 0, 0, tol, tol, nu,
@@ -384,7 +388,7 @@ TEST_F(DerivativeWASPTest, ClampedCtrlDerivativesWASP) {
   // forward differenced A and B
   mjtNum eps = 1e-6, tol = 1e-10;
   mjtNum *B_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * nu);
-  mjWASPCache *DyDu = mj_newWASPCache(nu, 2 * nv, use_wasp_identity_basis);
+  mjWASPCache *DyDu = mj_newWASPCache(nu, 2 * nv, 1, use_wasp_identity_basis);
   // set ctrl to the limits, request forward differences
   data->ctrl[0] = 1;
   data->ctrl[1] = -1;
@@ -480,10 +484,10 @@ TEST_F(DerivativeWASPTest, SensorDerivativesWASP) {
   mjtNum eps = 1e-6, tol = 1e-10;
   mjtNum *C_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * ns * 2 * nv);
   mjtNum *D_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * ns * nu);
-  mjWASPCache *DsDq = mj_newWASPCache(nv, ns, use_wasp_identity_basis);
-  mjWASPCache *DsDv = mj_newWASPCache(nv, ns, use_wasp_identity_basis);
+  mjWASPCache *DsDq = mj_newWASPCache(nv, ns, 1, use_wasp_identity_basis);
+  mjWASPCache *DsDv = mj_newWASPCache(nv, ns, 1, use_wasp_identity_basis);
   mjWASPCache *DsDa = nullptr;//mj_newWASPCache(model->na, ns, use_wasp_identity_basis);
-  mjWASPCache *DsDu = mj_newWASPCache(nu, ns, use_wasp_identity_basis);
+  mjWASPCache *DsDu = mj_newWASPCache(nu, ns, 1, use_wasp_identity_basis);
 
   mjd_transitionWASP(model, data, eps, /*centered=0*/
                      0, tol, tol, nv, tol, tol, nv, tol, tol, model->na, tol,
@@ -549,7 +553,7 @@ TEST_F(DerivativeWASPTest, SensorSkipWASP) {
   // finite differenced B
   mjtNum eps = 1e-6, tol = 1e-10;
   mjtNum *B_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * nu);
-  mjWASPCache *DyDu = mj_newWASPCache(nu, 2 * nv, use_wasp_identity_basis);
+  mjWASPCache *DyDu = mj_newWASPCache(nu, 2 * nv, 1, use_wasp_identity_basis);
 
   mjd_transitionWASP(model, data, eps, /*centered=0*/
                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,

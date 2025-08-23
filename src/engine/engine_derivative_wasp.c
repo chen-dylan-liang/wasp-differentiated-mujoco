@@ -626,22 +626,41 @@ void mj_deleteWASPCache(mjWASPCache* cache) {
 }
 
 // allocate wasp cache
-mjWASPCache* mj_newWASPCache(int n, int m, mjtByte identity_basis) {
+mjWASPCache* mj_newWASPCache(int n, int m, mjtByte reset, mjtByte identity_basis) {
     mjWASPCache* cache  = (mjWASPCache*) mju_malloc(sizeof(mjWASPCache));
     cache -> Delta_X = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
     cache -> C1  = (mjtNum*) mju_malloc(n*n*n*sizeof(mjtNum));
     cache -> C2 = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
     cache -> F_hat = (mjtNum*) mju_malloc(m*n*sizeof(mjtNum));
     cache -> fi = (mjtNum*) mju_malloc(m*sizeof(mjtNum));
-    mj_resetWASPCache(cache, n, m, identity_basis);
+    if (reset) mj_resetWASPCache(cache, n, m, identity_basis);
+    else mj_zeroWASPCache(cache, n, m, 1, 1);
     return cache;
 }
 
-// copy wasp cache
-void mj_copyWASPCache(int n, int m, mjWASPCache* dest, const mjWASPCache* src) {
-    mju_copy(dest->Delta_X, src->Delta_X, n*n);
-    mju_copy(dest->C1, src->C1, n*n*n);
-    mju_copy(dest->C2, src->C2, n*n);
-    mju_copy(dest->F_hat, src->F_hat, m*n);
-    mju_copy(dest->fi, src->fi, m);
+// zero wasp cache
+void mj_zeroWASPCache(mjWASPCache* cache, int n, int m) {
+    if (n>0) {
+        mju_zero(cache->Delta_X,  n*n);
+        mju_zero(cache->C1, n*n*n);
+        mju_zero(cache->C2,  n*n);
+    }
+    if (m>0) {
+        mju_zero(cache->F_hat,  m*n);
+        mju_zero(cache->fi, m);
+    }
+
 }
+// copy wasp cache
+void mj_copyWASPCache(mjWASPCache* dest, const mjWASPCache* src, int n, int m) {
+    if (n>0) {
+        mju_copy(dest->Delta_X, src->Delta_X, n*n);
+        mju_copy(dest->C1, src->C1, n*n*n);
+        mju_copy(dest->C2, src->C2, n*n);
+    }
+    if (m>0) {
+        mju_copy(dest->F_hat, src->F_hat, m*n);
+        mju_copy(dest->fi, src->fi, m);
+    }
+}
+
