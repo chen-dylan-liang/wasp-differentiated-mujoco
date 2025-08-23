@@ -135,36 +135,56 @@ static void mjd_stepWASPDu(const mjModel* m,
                            mjtNum* y_res,  mjtNum* s_res,
                            mjtNum* y_fi, mjtNum* s_fi,
                            mjWASPCache* y_cache, mjWASPCache* s_cache){
+    mjtNum* delta_u = mj_stackAllocNum(d, m->nu);
+
     for(int i=0; i<max_n ;i++){
-        size_t iu = y_cache?y_cache->i:s_cache->i;
-        int limited = m->actuator_ctrllimited[iu];
-        // nudge forward, if possible given ctrlrange
-        int nudge_fwd = !limited || inRange(ctrl[iu], ctrl[iu]+eps, m->actuator_ctrlrange+2*iu);
-        if (nudge_fwd) {
             // nudge forward
-            d->ctrl[iu] += eps;
-
-            // step, get nudged output
-            mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
-            getState(m, d, next_plus, sensor_plus);
-
-            // reset
-            mj_setState(m, d, fullstate, restore_spec);
-        }
-
-        // nudge backward, if possible given ctrlrange
-        int nudge_back = (flg_centered || !nudge_fwd) &&
-                         (!limited || inRange(ctrl[iu]-eps, ctrl[iu], m->actuator_ctrlrange+2*iu));
-        if (nudge_back) {
+            //d->ctrl[iu] += eps;
+            if (y_cache) {
+                mju_scl(delta_u, y_cache->C2+y_cache->i*m->nu, eps, m->nu);
+            }
+            else {
+                mju_scl(delta_u, s_cache->C2+s_cache->i*m->nu, eps, m->nu);
+            }
+            mju_addTo(d->ctrl, delta_u, m->nu);
+            // check whether exceeds limit
+            int nudge_fwd=0;
+            for (int j=0; j<m->nu;j++) {
+                int limited = m->actuator_ctrllimited[j];
+                if (limited&& !inRange(ctrl[j], ctrl[j]+eps, m->actuator_ctrlrange+2*j)) delta_u[j] = 0.0;
+                else nudge_fwd=1;
+            }
+            if (nudge_fwd) {
+                // step, get nudged output
+                mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
+                getState(m, d, next_plus, sensor_plus);
+                // reset
+                mj_setState(m, d, fullstate, restore_spec);
+            }
+        int nudge_back = 0;
+        if (flg_centered || !nudge_fwd) {
             // nudge backward
-            d->ctrl[iu] -= eps;
-
-            // step, get nudged output
-            mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
-            getState(m, d, next_minus, sensor_minus);
-
-            // reset
-            mj_setState(m, d, fullstate, restore_spec);
+            //d->ctrl[iu] -= eps;
+            if (y_cache) {
+                mju_scl(delta_u, y_cache->C2+y_cache->i*m->nu, -eps, m->nu);
+            }
+            else {
+                mju_scl(delta_u, s_cache->C2+s_cache->i*m->nu, -eps, m->nu);
+            }
+            mju_addTo(d->ctrl, delta_u, m->nu);
+            // check whether exceeds limit
+            for (int j=0; j<m->nu;j++) {
+                int limited = m->actuator_ctrllimited[j];
+                if (limited&& !inRange(ctrl[j]-eps, ctrl[j], m->actuator_ctrlrange+2*j)) delta_u[j] = 0.0;
+                else nudge_back=1;
+            }
+            if (nudge_back) {
+                // step, get nudged output
+                mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
+                getState(m, d, next_minus, sensor_minus);
+                // reset
+                mj_setState(m, d, fullstate, restore_spec);
+            }
         }
 
         // difference states
@@ -201,10 +221,18 @@ static void mjd_stepWASPDv(const mjModel* m,
                            mjtNum* y_res,  mjtNum* s_res,
                            mjtNum* y_fi, mjtNum* s_fi,
                            mjWASPCache* y_cache, mjWASPCache* s_cache){
+    mjtNum* delta_v = mj_stackAllocNum(d, m->nv);
     for(int i=0; i<max_n ;i++){
-    size_t iv = y_cache?y_cache->i:s_cache->i;
+    //size_t iv = y_cache?y_cache->i:s_cache->i;
     // nudge forward
-    d->qvel[iv] += eps;
+    //d->qvel[iv] += eps;
+    if (y_cache) {
+            mju_scl(delta_v, y_cache->C2+y_cache->i*m->nv, eps, m->nv);
+        }
+   else {
+            mju_scl(delta_v, s_cache->C2+s_cache->i*m->nv, eps, m->nv);
+        }
+        mju_addTo(d->ctrl, delta_v, m->nv);
 
     // step, get nudged output
     mj_stepSkip(m, d, mjSTAGE_POS, skipsensor);
@@ -215,8 +243,14 @@ static void mjd_stepWASPDv(const mjModel* m,
     // nudge backward
     if (flg_centered) {
         // nudge
-        d->qvel[iv] -= eps;
-
+        //d->qvel[iv] -= eps;
+        if (y_cache) {
+            mju_scl(delta_v, y_cache->C2+y_cache->i*m->nv, -eps, m->nv);
+        }
+        else {
+            mju_scl(delta_v, s_cache->C2+s_cache->i*m->nv, -eps, m->nv);
+        }
+        mju_addTo(d->ctrl, delta_v, m->nv);
         // step, get nudged output
         mj_stepSkip(m, d, mjSTAGE_POS, skipsensor);
         getState(m, d, next_minus, sensor_minus);
@@ -266,10 +300,18 @@ static void mjd_stepWASPDa(const mjModel* m,
                            mjtNum* y_res,  mjtNum* s_res,
                            mjtNum* y_fi, mjtNum* s_fi,
                            mjWASPCache* y_cache, mjWASPCache* s_cache){
+    mjtNum* delta_a = mj_stackAllocNum(d, m->na);
     for(int i=0; i<max_n ;i++){
-    size_t ia = y_cache?y_cache->i:s_cache->i;
+    //size_t ia = y_cache?y_cache->i:s_cache->i;
     // nudge forward
-    d->act[ia] += eps;
+    //d->act[ia] += eps;
+        if (y_cache) {
+            mju_scl(delta_a, y_cache->C2+y_cache->i*m->na, eps, m->na);
+        }
+        else {
+            mju_scl(delta_a, s_cache->C2+s_cache->i*m->na, eps, m->na);
+        }
+        mju_addTo(d->ctrl, delta_a, m->na);
 
     // step, get nudged output
     mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
@@ -281,7 +323,14 @@ static void mjd_stepWASPDa(const mjModel* m,
     // nudge backward
     if (flg_centered) {
         // nudge backward
-        d->act[ia] -= eps;
+        //d->act[ia] -= eps;
+        if (y_cache) {
+            mju_scl(delta_a, y_cache->C2+y_cache->i*m->na, eps, m->na);
+        }
+        else {
+            mju_scl(delta_a, s_cache->C2+s_cache->i*m->na, eps, m->na);
+        }
+        mju_addTo(d->ctrl, delta_a, m->na);
 
         // step, get nudged output
         mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
@@ -333,13 +382,12 @@ static void mjd_stepWASPDq(const mjModel* m,
                            mjtNum* y_res,  mjtNum* s_res,
                            mjtNum* y_fi, mjtNum* s_fi,
                            mjWASPCache* y_cache, mjWASPCache* s_cache){
+    mjtNum* delta_q = mj_stackAllocNum(d, m->nv);
     for(int i=0; i<max_n ;i++){
-    size_t iq = y_cache?y_cache->i:s_cache->i;
-    mjtNum *dpos  = mj_stackAllocNum(d, m->nv);  // allocate position perturbation
-    // nudge forward
-    mju_zero(dpos, m->nv);
-    dpos[iq] = 1;
-    mj_integratePos(m, d->qpos, dpos, eps);
+    //size_t iq = y_cache?y_cache->i:s_cache->i;
+    if (y_cache) mju_copy(delta_q, y_cache->C2+y_cache->i*m->nv, m->nv);
+    else mju_copy(delta_q, s_cache->C2+s_cache->i*m->nv, m->nv);
+    mj_integratePos(m, d->qpos, delta_q, eps);
 
     // step, get nudged output
     mj_stepSkip(m, d, mjSTAGE_NONE, skipsensor);
@@ -351,9 +399,7 @@ static void mjd_stepWASPDq(const mjModel* m,
     // nudge backward
     if (flg_centered) {
         // nudge backward
-        mju_zero(dpos, m->nv);
-        dpos[iq] = 1;
-        mj_integratePos(m, d->qpos, dpos, -eps);
+        mj_integratePos(m, d->qpos, delta_q, -eps);
 
         // step, get nudged output
         mj_stepSkip(m, d, mjSTAGE_NONE, skipsensor);
@@ -530,8 +576,6 @@ void mj_resetWASPCache(mjWASPCache* cache, int n, int m, mjtByte identity_basis)
             for (int i=0; i < n; i++) {cache->Delta_X[i*n+i] = 1.0;}
         }
         else {
-            // make distribution using seed
-            // Simple replacement for your C++ code
             srand(20250810);
             mjtNum* M = (mjtNum*)mju_malloc(sizeof(mjtNum)*n*n);
             for (int i = 0; i < n*n; i++) {
@@ -543,6 +587,7 @@ void mj_resetWASPCache(mjWASPCache* cache, int n, int m, mjtByte identity_basis)
             mju_free(R);
         }
         mju_zero(cache -> C1, n*n*n);
+        // C2 = Delta_X^T
         mju_transpose(cache->C2, cache->Delta_X,n,n);
         mjtNum* tmp = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
         mjtNum* I = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
@@ -590,4 +635,13 @@ mjWASPCache* mj_newWASPCache(int n, int m, mjtByte identity_basis) {
     cache -> fi = (mjtNum*) mju_malloc(m*sizeof(mjtNum));
     mj_resetWASPCache(cache, n, m, identity_basis);
     return cache;
+}
+
+// copy wasp cache
+void mj_copyWASPCache(int n, int m, mjWASPCache* dest, const mjWASPCache* src) {
+    mju_copy(dest->Delta_X, src->Delta_X, n*n);
+    mju_copy(dest->C1, src->C1, n*n*n);
+    mju_copy(dest->C2, src->C2, n*n);
+    mju_copy(dest->F_hat, src->F_hat, m*n);
+    mju_copy(dest->fi, src->fi, m);
 }

@@ -25,6 +25,9 @@ extern "C" {
     // allocate wasp cache
     MJAPI mjWASPCache* mj_newWASPCache(int n, int m, mjtByte identity_basis);
 
+    // copy wasp cache
+    MJAPI void mj_copyWASPCache(int n, int m, mjWASPCache* dest, const mjWASPCache* src);
+
 
     // wasp differenced transition matrices (control theory notation)
     MJAPI void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
