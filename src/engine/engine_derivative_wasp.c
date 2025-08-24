@@ -90,12 +90,15 @@ static void clampedStateDiff(const mjModel* m, mjtNum* ds, const mjtNum* s, cons
                              const mjtNum* s_minus, mjtNum h) {
     if (s_plus && !s_minus) {
         // forward differencing
+       // printf("forward diff\n");
         stateDiff(m, ds, s, s_plus, h);
     } else if (!s_plus && s_minus) {
         // backward differencing
+       // printf("backward diff\n");
         stateDiff(m, ds, s_minus, s, h);
     } else if (s_plus && s_minus) {
         // centered differencing
+       // printf("central diff\n");
         stateDiff(m, ds, s_minus, s_plus, 2*h);
     } else {
         // differencing failed, write zeros
@@ -140,45 +143,56 @@ static void mjd_stepWASPDu(const mjModel* m,
     for(int i=0; i<max_n ;i++){
             // nudge forward
             //d->ctrl[iu] += eps;
-            if (y_cache) {
-                mju_scl(delta_u, y_cache->C2+y_cache->i*m->nu, eps, m->nu);
-            }
-            else {
-                mju_scl(delta_u, s_cache->C2+s_cache->i*m->nu, eps, m->nu);
-            }
-            mju_addTo(d->ctrl, delta_u, m->nu);
             // check whether exceeds limit
-            int nudge_fwd=0;
+            int nudge_fwd=1;
+           // printf("%d of %d\n",i, max_n);
             for (int j=0; j<m->nu;j++) {
                 int limited = m->actuator_ctrllimited[j];
-                if (limited&& !inRange(ctrl[j], ctrl[j]+eps, m->actuator_ctrlrange+2*j)) delta_u[j] = 0.0;
-                else nudge_fwd=1;
+                mjtNum delta =  y_cache?(y_cache->C2+y_cache->i*m->nu)[j]:(s_cache->C2+s_cache->i*m->nu)[j];
+               // printf("delta_u=%f\n",delta);
+                if (limited&& !inRange(ctrl[j], ctrl[j]+eps*delta, m->actuator_ctrlrange+2*j)) {
+                    nudge_fwd=0;
+                    break;
+                }
             }
             if (nudge_fwd) {
+              //  printf("nudging forward!\n");
+                if (y_cache) {
+                    mju_scl(delta_u, y_cache->C2+y_cache->i*m->nu, eps, m->nu);
+                }
+                else {
+                    mju_scl(delta_u, s_cache->C2+s_cache->i*m->nu, eps, m->nu);
+                }
+                mju_addTo(d->ctrl, delta_u, m->nu);
                 // step, get nudged output
                 mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
                 getState(m, d, next_plus, sensor_plus);
                 // reset
                 mj_setState(m, d, fullstate, restore_spec);
             }
-        int nudge_back = 0;
-        if (flg_centered || !nudge_fwd) {
-            // nudge backward
-            //d->ctrl[iu] -= eps;
-            if (y_cache) {
-                mju_scl(delta_u, y_cache->C2+y_cache->i*m->nu, -eps, m->nu);
-            }
-            else {
-                mju_scl(delta_u, s_cache->C2+s_cache->i*m->nu, -eps, m->nu);
-            }
-            mju_addTo(d->ctrl, delta_u, m->nu);
+
+        // nudge backward
+        //d->ctrl[iu] -= eps;
+        int nudge_back = flg_centered || !nudge_fwd;
+        if (nudge_back) {
             // check whether exceeds limit
             for (int j=0; j<m->nu;j++) {
                 int limited = m->actuator_ctrllimited[j];
-                if (limited&& !inRange(ctrl[j]-eps, ctrl[j], m->actuator_ctrlrange+2*j)) delta_u[j] = 0.0;
-                else nudge_back=1;
+                mjtNum delta = y_cache?(y_cache->C2+y_cache->i*m->nu)[j]:(s_cache->C2+s_cache->i*m->nu)[j];
+                if (limited&& !inRange(ctrl[j]-eps*delta, ctrl[j], m->actuator_ctrlrange+2*j)) {
+                    nudge_back=0;
+                    break;
+                }
             }
             if (nudge_back) {
+              //  printf("nudging back!\n");
+                if (y_cache) {
+                    mju_scl(delta_u, y_cache->C2+y_cache->i*m->nu, -eps, m->nu);
+                }
+                else {
+                    mju_scl(delta_u, s_cache->C2+s_cache->i*m->nu, -eps, m->nu);
+                }
+                mju_addTo(d->ctrl, delta_u, m->nu);
                 // step, get nudged output
                 mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
                 getState(m, d, next_minus, sensor_minus);
@@ -186,7 +200,6 @@ static void mjd_stepWASPDu(const mjModel* m,
                 mj_setState(m, d, fullstate, restore_spec);
             }
         }
-
         // difference states
         mjtByte y_accurate=1, s_accurate=1;
         if (y_cache) {
@@ -232,7 +245,7 @@ static void mjd_stepWASPDv(const mjModel* m,
    else {
             mju_scl(delta_v, s_cache->C2+s_cache->i*m->nv, eps, m->nv);
         }
-        mju_addTo(d->ctrl, delta_v, m->nv);
+        mju_addTo(d->qvel, delta_v, m->nv);
 
     // step, get nudged output
     mj_stepSkip(m, d, mjSTAGE_POS, skipsensor);
@@ -250,7 +263,7 @@ static void mjd_stepWASPDv(const mjModel* m,
         else {
             mju_scl(delta_v, s_cache->C2+s_cache->i*m->nv, -eps, m->nv);
         }
-        mju_addTo(d->ctrl, delta_v, m->nv);
+        mju_addTo(d->qvel, delta_v, m->nv);
         // step, get nudged output
         mj_stepSkip(m, d, mjSTAGE_POS, skipsensor);
         getState(m, d, next_minus, sensor_minus);
@@ -634,12 +647,13 @@ mjWASPCache* mj_newWASPCache(int n, int m, mjtByte reset, mjtByte identity_basis
     cache -> F_hat = (mjtNum*) mju_malloc(m*n*sizeof(mjtNum));
     cache -> fi = (mjtNum*) mju_malloc(m*sizeof(mjtNum));
     if (reset) mj_resetWASPCache(cache, n, m, identity_basis);
-    else mj_zeroWASPCache(cache, n, m, 1, 1);
+    else mj_zeroWASPCache(cache, n, m);
     return cache;
 }
 
 // zero wasp cache
 void mj_zeroWASPCache(mjWASPCache* cache, int n, int m) {
+    cache->i=0;
     if (n>0) {
         mju_zero(cache->Delta_X,  n*n);
         mju_zero(cache->C1, n*n*n);

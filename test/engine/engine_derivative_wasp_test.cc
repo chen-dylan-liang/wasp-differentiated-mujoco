@@ -33,7 +33,7 @@ using ::testing::Eq;
 using ::testing::NotNull;
 using ::testing::Pointwise;
 using DerivativeWASPTest = MujocoTest;
-static const mjtByte use_wasp_identity_basis = 0;
+static const mjtByte use_wasp_identity_basis = 1;
 
 // Analytic transition matrices for linear dynamical system xn = A*x + B*u
 //   given modified mass matrix H (`data->qH`) and
@@ -157,6 +157,7 @@ void printWASPCache(const mjWASPCache* cache, int n, int m, bool print_x) {
   std::cout<<"fi:"<<std::endl;
   PrintMatrix(cache->fi,m,1);
 }
+
 // Test QR decomposition for WASP Cache
 TEST_F(DerivativeWASPTest, QRDecomposition) {
   // n = m
@@ -232,10 +233,10 @@ TEST_F(DerivativeWASPTest, NoStateMutationWASP) {
   mjWASPCache *DsDv = mj_newWASPCache(nv, ns, 0, use_wasp_identity_basis);
   mjWASPCache *DsDa = mj_newWASPCache(na, ns, 0, use_wasp_identity_basis);
   mjWASPCache *DsDu = mj_newWASPCache(nu, ns, 0, use_wasp_identity_basis);
-  mj_copyWASPCache(DyDq, DsDq, nv, 0);
-  mj_copyWASPCache(DyDv, DsDv, nv, 0);
-  mj_copyWASPCache(DyDa, DsDa, na, 0);
-  mj_copyWASPCache(DyDu, DsDu, nu, 0);
+  mj_copyWASPCache(DsDq, DyDq, nv, 0);
+  mj_copyWASPCache(DsDv, DyDv, nv, 0);
+  mj_copyWASPCache(DsDa, DyDa, na, 0);
+  mj_copyWASPCache(DsDu, DyDu, nu, 0);
   mjtNum eps = 1e-6, tol = 1e-10;
   mjd_transitionWASP(model, data, eps, /*centered=0*/
                      0, tol, tol, nv, tol, tol, nv, tol, tol, na, tol, tol, nu,
@@ -288,7 +289,7 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
 
   // uncomment for debugging:
   //std::cout<<"A:"<<std::endl;
- //  PrintMatrix(A, 2*nv, 2*nv);
+   //PrintMatrix(A, 2*nv, 2*nv);
   //std::cout<<"B:"<<std::endl;
   // PrintMatrix(B, 2*nv, nu);
 
@@ -306,9 +307,9 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
                      DyDu, nullptr, nullptr, nullptr, nullptr);
   // uncomment for debugging:
   //std::cout<<"DyDq:"<<std::endl;
-  //printWASPCache(DyDq, nv, 2*nv, false);
- // std::cout<<"DyDv:"<<std::endl;
- // printWASPCache(DyDv, nv, 2*nv, false);
+ // printWASPCache(DyDq, nv, 2*nv, false);
+  //std::cout<<"DyDv:"<<std::endl;
+  //printWASPCache(DyDv, nv, 2*nv, false);
   //std::cout<<"A_wasp:"<<std::endl;
   //PrintMatrix(A_WASP, 2*nv, 2*nv);
   //std::cout<<"DyDu:"<<std::endl;
@@ -333,18 +334,17 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
                      DyDuc, nullptr, nullptr, nullptr, nullptr);
 
   // uncomment for debugging:
-  /*
-  std::cout<<"DyDqc:"<<std::endl;
-  printWASPCache(DyDqc, nv, 2*nv, true);
-  std::cout<<"DyDvc:"<<std::endl;
-  printWASPCache(DyDvc, nv, 2*nv, true);
-  std::cout<<"A_waspc:"<<std::endl;
-  PrintMatrix(A_WASPc, 2*nv, 2*nv);
-  std::cout<<"DyDuc:"<<std::endl;
-  printWASPCache(DyDuc, nu, 2*nv, true);
-  std::cout<<"B_wasp:"<<std::endl;
-  PrintMatrix(B_WASPc, 2*nv, nu);
-*/
+  //std::cout<<"DyDqc:"<<std::endl;
+  //printWASPCache(DyDqc, nv, 2*nv, true);
+  //std::cout<<"DyDvc:"<<std::endl;
+  //printWASPCache(DyDvc, nv, 2*nv, true);
+  //std::cout<<"A_waspc:"<<std::endl;
+  //PrintMatrix(A_WASPc, 2*nv, 2*nv);
+  //std::cout<<"DyDuc:"<<std::endl;
+ // printWASPCache(DyDuc, nu, 2*nv, true);
+ // std::cout<<"B_wasp:"<<std::endl;
+  //PrintMatrix(B_WASPc, 2*nv, nu);
+
   CompareMatrices(A_WASP, A_WASPc, 2 * nv, 2 * nv, tol);
   std::cout<<"Finished comparing results for A central."<<std::endl;
   CompareMatrices(B_WASP, B_WASPc, 2 * nv, nu, tol);
@@ -362,82 +362,6 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
   mj_deleteWASPCache(DyDu);
   mj_deleteWASPCache(DyDv);
   mj_deleteWASPCache(DyDq);
-  mj_deleteData(data);
-  mj_deleteModel(model);
-}
-
-// check WASP ctrl derivatives at the range limit
-TEST_F(DerivativeWASPTest, ClampedCtrlDerivativesWASP) {
-  const std::string xml_path = GetTestDataFilePath(kLinearPath);
-  mjModel *model = mj_loadXML(xml_path.c_str(), nullptr, nullptr, 0);
-  mjData *data = mj_makeData(model);
-  int nv = model->nv, nu = model->nu;
-
-  // set ctrl, integrate for 20 steps
-  data->ctrl[0] = .1;
-  data->ctrl[1] = -.1;
-  for (int i = 0; i < 20; i++) {
-    mj_step(model, data);
-  }
-
-  // analytic B
-  mjtNum *B = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * nu);
-
-  LinearSystem(model, data, nullptr, B);
-
-  // forward differenced A and B
-  mjtNum eps = 1e-6, tol = 1e-10;
-  mjtNum *B_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * nu);
-  mjWASPCache *DyDu = mj_newWASPCache(nu, 2 * nv, 1, use_wasp_identity_basis);
-  // set ctrl to the limits, request forward differences
-  data->ctrl[0] = 1;
-  data->ctrl[1] = -1;
-  mjd_transitionWASP(model, data, eps, /*centered=0*/
-                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
-                     B_WASP, nullptr, nullptr, nullptr, nullptr, nullptr, DyDu,
-                     nullptr, nullptr, nullptr, nullptr);
-
-  // expect WASP and analytic derivatives to be similar to eps precision
-  CompareMatrices(B, B_WASP, 2 * nv, nu, eps);
-
-  // ctrl remains at limits, request central differences
-  mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
-  mjd_transitionWASP(model, data, eps, /*centered=0*/
-                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
-                     B_WASP, nullptr, nullptr, nullptr, nullptr, nullptr, DyDu,
-                     nullptr, nullptr, nullptr, nullptr);
-
-  // expect WASP and analytic derivatives to be similar to eps precision
-  CompareMatrices(B, B_WASP, 2 * nv, nu, eps);
-
-  // set ctrl beyond limits, request forward differences
-  data->ctrl[0] = 2;
-  data->ctrl[1] = -2;
-  mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
-  mjd_transitionWASP(model, data, eps, /*centered=0*/
-                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
-                     B_WASP, nullptr, nullptr, nullptr, nullptr, nullptr, DyDu,
-                     nullptr, nullptr, nullptr, nullptr);
-
-  // expect derivatives to be 0
-  EXPECT_THAT(AsVector(B_WASP, 2 * nv * nu), Each(Eq(0.0)));
-
-  // expect ctrl to remain unchanged (despite internal clamping)
-  EXPECT_EQ(data->ctrl[0], 2.0);
-  EXPECT_EQ(data->ctrl[1], -2.0);
-
-  // ctrl remains beyond limits, request centered differences
-  mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
-  mjd_transitionWASP(model, data, eps, /*centered=0*/
-                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
-                     B_WASP, nullptr, nullptr, nullptr, nullptr, nullptr, DyDu,
-                     nullptr, nullptr, nullptr, nullptr);
-  // expect derivatives to be 0
-  EXPECT_THAT(AsVector(B_WASP, 2 * nv * nu), Each(Eq(0.0)));
-
-  mju_free(B_WASP);
-  mju_free(B);
-  mj_deleteWASPCache(DyDu);
   mj_deleteData(data);
   mj_deleteModel(model);
 }
@@ -561,6 +485,82 @@ TEST_F(DerivativeWASPTest, SensorSkipWASP) {
                      nullptr, nullptr, nullptr, nullptr);
   EXPECT_EQ(data->sensordata[0], 1337) << "sensors should not be recomputed";
   mju_free(B_WASP);
+  mj_deleteWASPCache(DyDu);
+  mj_deleteData(data);
+  mj_deleteModel(model);
+}
+// check WASP ctrl derivatives at the range limit
+TEST_F(DerivativeWASPTest, ClampedCtrlDerivativesWASP) {
+  const std::string xml_path = GetTestDataFilePath(kLinearPath);
+  mjModel *model = mj_loadXML(xml_path.c_str(), nullptr, nullptr, 0);
+  mjData *data = mj_makeData(model);
+  int nv = model->nv, nu = model->nu;
+
+  // set ctrl, integrate for 20 steps
+  data->ctrl[0] = .1;
+  data->ctrl[1] = -.1;
+  for (int i = 0; i < 20; i++) {
+    mj_step(model, data);
+  }
+
+  // analytic B
+  mjtNum *B = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * nu);
+
+  LinearSystem(model, data, nullptr, B);
+
+  // forward differenced A and B
+  mjtNum eps = 1e-6, tol = 1e-10;
+  mjtNum *B_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * nu);
+  mjWASPCache *DyDu = mj_newWASPCache(nu, 2 * nv, 1, use_wasp_identity_basis);
+  // set ctrl to the limits, request forward differences
+  data->ctrl[0] = 1;
+  data->ctrl[1] = -1;
+  mjd_transitionWASP(model, data, eps, /*centered=0*/
+                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
+                     B_WASP, nullptr, nullptr, nullptr, nullptr, nullptr, DyDu,
+                     nullptr, nullptr, nullptr, nullptr);
+
+  // expect WASP and analytic derivatives to be similar to eps precision
+  CompareMatrices(B, B_WASP, 2 * nv, nu, eps);
+
+  // ctrl remains at limits, request central differences
+  mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
+  mjd_transitionWASP(model, data, eps, /*centered=0*/
+                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
+                     B_WASP, nullptr, nullptr, nullptr, nullptr, nullptr, DyDu,
+                     nullptr, nullptr, nullptr, nullptr);
+
+  // expect WASP and analytic derivatives to be similar to eps precision
+  CompareMatrices(B, B_WASP, 2 * nv, nu, eps);
+  std::cout<<"Finished comparing results for B limit1."<<std::endl;
+  // set ctrl beyond limits, request forward differences
+  data->ctrl[0] = 2;
+  data->ctrl[1] = -2;
+  mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
+  mjd_transitionWASP(model, data, eps, /*centered=0*/
+                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
+                     B_WASP, nullptr, nullptr, nullptr, nullptr, nullptr, DyDu,
+                     nullptr, nullptr, nullptr, nullptr);
+
+  // expect derivatives to be 0
+  EXPECT_THAT(AsVector(B_WASP, 2 * nv * nu), Each(Eq(0.0)));
+  std::cout<<"Finished comparing results for B limit2."<<std::endl;
+  // expect ctrl to remain unchanged (despite internal clamping)
+  EXPECT_EQ(data->ctrl[0], 2.0);
+  EXPECT_EQ(data->ctrl[1], -2.0);
+  std::cout<<"Finished comparing results for control before and after."<<std::endl;
+
+  // ctrl remains beyond limits, request centered differences
+  mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
+  mjd_transitionWASP(model, data, eps, /*centered=0*/
+                     1, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
+                     B_WASP, nullptr, nullptr, nullptr, nullptr, nullptr, DyDu,
+                     nullptr, nullptr, nullptr, nullptr);
+  // expect derivatives to be 0
+  EXPECT_THAT(AsVector(B_WASP, 2 * nv * nu), Each(Eq(0.0)));
+  std::cout<<"Finished comparing results for B limit2 central."<<std::endl;
+  mju_free(B_WASP);
+  mju_free(B);
   mj_deleteWASPCache(DyDu);
   mj_deleteData(data);
   mj_deleteModel(model);
