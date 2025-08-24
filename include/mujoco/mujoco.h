@@ -1328,17 +1328,19 @@ MJAPI void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte f
                         mjWASPCache* DyDu_cache,
                         mjWASPCache* DsDq_cache, mjWASPCache* DsDv_cache, mjWASPCache* DsDa_cache,
                         mjWASPCache* DsDu_cache);
- // reset wasp cache
-MJAPI void mj_resetWASPCache(mjWASPCache* cache, int n, int m, mjtByte identity_basis);
+
+// reset wasp cache basis
+MJAPI void mj_resetWASPCacheBasis(mjWASPCache* cache, int n, mjtByte identity_basis);
+
+// copy wasp cache basis
+MJAPI void mj_copyWASPCacheBasis(mjWASPCache* dest, const mjWASPCache* src, int n);
 
 // delete wasp cache
 MJAPI void mj_deleteWASPCache(mjWASPCache* cache);
 
 // allocate wasp cache
-MJAPI mjWASPCache* mj_newWASPCache(int n, int m, mjtByte reset, mjtByte identity_basis);
+MJAPI mjWASPCache* mj_newWASPCache(int n, int m, mjtByte reset_basis, mjtByte identity_basis);
 
-// copy wasp cache
-MJAPI void mj_copyWASPCache(mjWASPCache* dest, const mjWASPCache* src, int n, int m);
 
 // zero wasp cache
 MJAPI void mj_zeroWASPCache(mjWASPCache* cache, int n, int m);

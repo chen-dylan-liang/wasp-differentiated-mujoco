@@ -233,10 +233,10 @@ TEST_F(DerivativeWASPTest, NoStateMutationWASP) {
   mjWASPCache *DsDv = mj_newWASPCache(nv, ns, 0, use_wasp_identity_basis);
   mjWASPCache *DsDa = mj_newWASPCache(na, ns, 0, use_wasp_identity_basis);
   mjWASPCache *DsDu = mj_newWASPCache(nu, ns, 0, use_wasp_identity_basis);
-  mj_copyWASPCache(DsDq, DyDq, nv, 0);
-  mj_copyWASPCache(DsDv, DyDv, nv, 0);
-  mj_copyWASPCache(DsDa, DyDa, na, 0);
-  mj_copyWASPCache(DsDu, DyDu, nu, 0);
+  mj_copyWASPCacheBasis(DsDq, DyDq, nv);
+  mj_copyWASPCacheBasis(DsDv, DyDv, nv);
+  mj_copyWASPCacheBasis(DsDa, DyDa, na);
+  mj_copyWASPCacheBasis(DsDu, DyDu, nu);
   mjtNum eps = 1e-6, tol = 1e-10;
   mjd_transitionWASP(model, data, eps, /*centered=0*/
                      0, tol, tol, nv, tol, tol, nv, tol, tol, na, tol, tol, nu,
@@ -527,7 +527,8 @@ TEST_F(DerivativeWASPTest, ClampedCtrlDerivativesWASP) {
     //PrintMatrix(B_WASP, 2*nv, nu);
     std::cout<<"Finished comparing results for B limit1."<<std::endl;
     // ctrl remains at limits, request central differences
-    mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
+    mj_zeroWASPCache(DyDu, 0, 2*nv);
+    //mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
     mjd_transitionWASP(model, data, eps, /*centered=0*/
                        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
                        B_WASP, nullptr, nullptr, nullptr, nullptr, nullptr, DyDu,
@@ -541,7 +542,8 @@ TEST_F(DerivativeWASPTest, ClampedCtrlDerivativesWASP) {
   data->ctrl[0] = 2;
   data->ctrl[1] = -2;
   //printWASPCache(DyDu,nu ,2*nv,1);
-  mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
+  mj_zeroWASPCache(DyDu, 0, 2*nv);
+  //mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
   //printWASPCache(DyDu,nu ,2* nu,1);
   mjd_transitionWASP(model, data, eps, /*centered=0*/
                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
@@ -556,7 +558,8 @@ TEST_F(DerivativeWASPTest, ClampedCtrlDerivativesWASP) {
   std::cout<<"Finished comparing results for control before and after."<<std::endl;
 
   // ctrl remains beyond limits, request centered differences
-  mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
+  mj_zeroWASPCache(DyDu, 0, 2*nv);
+  //mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
   mjd_transitionWASP(model, data, eps, /*centered=0*/
                      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
                      B_WASP, nullptr, nullptr, nullptr, nullptr, nullptr, DyDu,
