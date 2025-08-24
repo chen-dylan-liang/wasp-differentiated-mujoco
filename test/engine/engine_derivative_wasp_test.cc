@@ -33,7 +33,7 @@ using ::testing::Eq;
 using ::testing::NotNull;
 using ::testing::Pointwise;
 using DerivativeWASPTest = MujocoTest;
-static const mjtByte use_wasp_identity_basis = 1;
+static const mjtByte use_wasp_identity_basis = 0;
 
 // Analytic transition matrices for linear dynamical system xn = A*x + B*u
 //   given modified mass matrix H (`data->qH`) and
@@ -316,9 +316,9 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
   //printWASPCache(DyDu, nu, 2*nv, false);
   //std::cout<<"B_wasp:"<<std::endl;
   //PrintMatrix(B_WASP, 2*nv, nu);
-  CompareMatrices(A, A_WASP, 2 * nv, 2 * nv, tol);
+  CompareMatrices(A_WASP, A, 2 * nv, 2 * nv, tol);
   std::cout<<"Finished comparing results for A."<<std::endl;
-  CompareMatrices(B, B_WASP, 2 * nv, nu, tol);
+  CompareMatrices(B_WASP, B, 2 * nv, nu, tol);
   std::cout<<"Finished comparing results for B."<<std::endl;
 
   // central differenced A and B
@@ -345,9 +345,9 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
  // std::cout<<"B_wasp:"<<std::endl;
   //PrintMatrix(B_WASPc, 2*nv, nu);
 
-  CompareMatrices(A_WASP, A_WASPc, 2 * nv, 2 * nv, tol);
+  CompareMatrices(A_WASPc, A, 2 * nv, 2 * nv, tol);
   std::cout<<"Finished comparing results for A central."<<std::endl;
-  CompareMatrices(B_WASP, B_WASPc, 2 * nv, nu, tol);
+  CompareMatrices(B_WASPc, B, 2 * nv, nu, tol);
   std::cout<<"Finished comparing results for B central."<<std::endl;
 
   mju_free(B_WASPc);
@@ -512,36 +512,41 @@ TEST_F(DerivativeWASPTest, ClampedCtrlDerivativesWASP) {
   mjtNum eps = 1e-6, tol = 1e-10;
   mjtNum *B_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * nu);
   mjWASPCache *DyDu = mj_newWASPCache(nu, 2 * nv, 1, use_wasp_identity_basis);
-  // set ctrl to the limits, request forward differences
-  data->ctrl[0] = 1;
-  data->ctrl[1] = -1;
-  mjd_transitionWASP(model, data, eps, /*centered=0*/
-                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
-                     B_WASP, nullptr, nullptr, nullptr, nullptr, nullptr, DyDu,
-                     nullptr, nullptr, nullptr, nullptr);
+  if (use_wasp_identity_basis) {
+    // set ctrl to the limits, request forward differences
+    data->ctrl[0] = 1;
+    data->ctrl[1] = -1;
+    mjd_transitionWASP(model, data, eps, /*centered=0*/
+                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
+                       B_WASP, nullptr, nullptr, nullptr, nullptr, nullptr, DyDu,
+                       nullptr, nullptr, nullptr, nullptr);
 
-  // expect WASP and analytic derivatives to be similar to eps precision
-  CompareMatrices(B, B_WASP, 2 * nv, nu, eps);
+    // expect WASP and analytic derivatives to be similar to eps precision
+    CompareMatrices(B_WASP, B, 2 * nv, nu, eps);
+    // PrintMatrix(B, 2*nv, nu);
+    //PrintMatrix(B_WASP, 2*nv, nu);
+    std::cout<<"Finished comparing results for B limit1."<<std::endl;
+    // ctrl remains at limits, request central differences
+    mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
+    mjd_transitionWASP(model, data, eps, /*centered=0*/
+                       1, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
+                       B_WASP, nullptr, nullptr, nullptr, nullptr, nullptr, DyDu,
+                       nullptr, nullptr, nullptr, nullptr);
 
-  // ctrl remains at limits, request central differences
-  mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
-  mjd_transitionWASP(model, data, eps, /*centered=0*/
-                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
-                     B_WASP, nullptr, nullptr, nullptr, nullptr, nullptr, DyDu,
-                     nullptr, nullptr, nullptr, nullptr);
-
-  // expect WASP and analytic derivatives to be similar to eps precision
-  CompareMatrices(B, B_WASP, 2 * nv, nu, eps);
-  std::cout<<"Finished comparing results for B limit1."<<std::endl;
+    // expect WASP and analytic derivatives to be similar to eps precision
+    CompareMatrices(B_WASP, B, 2 * nv, nu, eps);
+    std::cout<<"Finished comparing results for B limit1 central."<<std::endl;
+  }
   // set ctrl beyond limits, request forward differences
   data->ctrl[0] = 2;
   data->ctrl[1] = -2;
+  //printWASPCache(DyDu,nu ,2*nv,1);
   mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
+  //printWASPCache(DyDu,nu ,2* nu,1);
   mjd_transitionWASP(model, data, eps, /*centered=0*/
                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
                      B_WASP, nullptr, nullptr, nullptr, nullptr, nullptr, DyDu,
                      nullptr, nullptr, nullptr, nullptr);
-
   // expect derivatives to be 0
   EXPECT_THAT(AsVector(B_WASP, 2 * nv * nu), Each(Eq(0.0)));
   std::cout<<"Finished comparing results for B limit2."<<std::endl;

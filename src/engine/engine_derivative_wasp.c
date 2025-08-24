@@ -138,74 +138,68 @@ static void mjd_stepWASPDu(const mjModel* m,
                            mjtNum* y_res,  mjtNum* s_res,
                            mjtNum* y_fi, mjtNum* s_fi,
                            mjWASPCache* y_cache, mjWASPCache* s_cache){
-    mjtNum* delta_u = mj_stackAllocNum(d, m->nu);
+    mjtNum* delta_u_fwd = mj_stackAllocNum(d, m->nu), *delta_u_back=mj_stackAllocNum(d, m->nu);
 
     for(int i=0; i<max_n ;i++){
-            // nudge forward
-            //d->ctrl[iu] += eps;
-            // check whether exceeds limit
-            int nudge_fwd=1;
-           // printf("%d of %d\n",i, max_n);
+            int fwd_exceeds=0, back_exceeds=0; // =1 when there's exceeding along 1 axis
+            //printf("%d of %d\n",i, max_n);
+            // check whether forward exceeds limit
             for (int j=0; j<m->nu;j++) {
                 int limited = m->actuator_ctrllimited[j];
-                mjtNum delta =  y_cache?(y_cache->C2+y_cache->i*m->nu)[j]:(s_cache->C2+s_cache->i*m->nu)[j];
+                delta_u_fwd[j] =  y_cache?(y_cache->C2+y_cache->i*m->nu)[j]*eps:(s_cache->C2+s_cache->i*m->nu)[j]*eps;
                // printf("delta_u=%f\n",delta);
-                if (limited&& !inRange(ctrl[j], ctrl[j]+eps*delta, m->actuator_ctrlrange+2*j)) {
-                    nudge_fwd=0;
-                    break;
+                mjtNum u0 = mju_min(ctrl[j], ctrl[j]+delta_u_fwd[j]), u1=mju_max(ctrl[j], ctrl[j]+delta_u_fwd[j]);
+                if (limited&& !inRange(u0, u1, m->actuator_ctrlrange+2*j)) {
+                    delta_u_fwd[j]=0.0;
+                    fwd_exceeds=1;
+                   // printf("%d fwd exceeds\n",j);
                 }
             }
+            //if (y_cache) mju_printMat(y_cache->C2+y_cache->i*m->nu, 1,m->nu);
+        //    mju_printMat(delta_u_fwd, 1, m->nu);
+           // check whether backward exceeds limit
+            for (int j=0; j<m->nu;j++) {
+            int limited = m->actuator_ctrllimited[j];
+            delta_u_back[j] =  y_cache?(y_cache->C2+y_cache->i*m->nu)[j]*(-eps):(s_cache->C2+s_cache->i*m->nu)[j]*(-eps);
+            mjtNum u0 = mju_min(ctrl[j], ctrl[j]+delta_u_back[j]), u1=mju_max(ctrl[j], ctrl[j]+delta_u_back[j]);
+            if (limited&& !inRange(u0, u1, m->actuator_ctrlrange+2*j)) {
+                delta_u_back[j]=0.0;
+                back_exceeds=1;
+                //printf("%d backward exceeds\n",j);
+            }
+        }
+        int nudge_fwd = !mju_isZero(delta_u_fwd, m->nu) // don't nudge forward when delta_u is all zero
+        &&!(fwd_exceeds&&!back_exceeds); // fall to backward differencing when fwd exceeds but backward is accurate
             if (nudge_fwd) {
-              //  printf("nudging forward!\n");
-                if (y_cache) {
-                    mju_scl(delta_u, y_cache->C2+y_cache->i*m->nu, eps, m->nu);
-                }
-                else {
-                    mju_scl(delta_u, s_cache->C2+s_cache->i*m->nu, eps, m->nu);
-                }
-                mju_addTo(d->ctrl, delta_u, m->nu);
+               // printf("nudging forward!\n");
+                mju_addTo(d->ctrl, delta_u_fwd, m->nu);
                 // step, get nudged output
                 mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
                 getState(m, d, next_plus, sensor_plus);
                 // reset
                 mj_setState(m, d, fullstate, restore_spec);
             }
-
-        // nudge backward
-        //d->ctrl[iu] -= eps;
-        int nudge_back = flg_centered || !nudge_fwd;
-        if (nudge_back) {
-            // check whether exceeds limit
-            for (int j=0; j<m->nu;j++) {
-                int limited = m->actuator_ctrllimited[j];
-                mjtNum delta = y_cache?(y_cache->C2+y_cache->i*m->nu)[j]:(s_cache->C2+s_cache->i*m->nu)[j];
-                if (limited&& !inRange(ctrl[j]-eps*delta, ctrl[j], m->actuator_ctrlrange+2*j)) {
-                    nudge_back=0;
-                    break;
-                }
-            }
+        int nudge_back = !mju_isZero(delta_u_back, m->nu) // don't nudge backward when delta_u is all zero
+        &&!(!flg_centered&&!fwd_exceeds) // no need to nudge backward when using forward differencing and forward is accurate
+        // (forward differencing falls to central differencing whenever fwd exceeds)
+        &&!(!fwd_exceeds&&back_exceeds); // fall to forward differencing when backward exceeds but forward is accurate
             if (nudge_back) {
-              //  printf("nudging back!\n");
-                if (y_cache) {
-                    mju_scl(delta_u, y_cache->C2+y_cache->i*m->nu, -eps, m->nu);
-                }
-                else {
-                    mju_scl(delta_u, s_cache->C2+s_cache->i*m->nu, -eps, m->nu);
-                }
-                mju_addTo(d->ctrl, delta_u, m->nu);
+                //printf("nudging back!\n");
+                mju_addTo(d->ctrl, delta_u_back, m->nu);
                 // step, get nudged output
                 mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
                 getState(m, d, next_minus, sensor_minus);
                 // reset
                 mj_setState(m, d, fullstate, restore_spec);
             }
-        }
+
+
         // difference states
         mjtByte y_accurate=1, s_accurate=1;
         if (y_cache) {
             mju_copy(y_fi, y_cache->fi, 2*m->nv+m->na);
             clampedStateDiff(m, y_cache->fi, next, nudge_fwd ? next_plus : NULL,
-                             nudge_back ? next_minus : NULL, eps);
+                           nudge_back ? next_minus : NULL, eps);
             waspUpdate(d, y_res, y_cache, 2*m->nv+m->na, m->nu);
             y_accurate=closeEnough(y_fi, y_cache->fi, 2*m->nv+m->na, dell, dtheta);
         }
@@ -589,7 +583,8 @@ void mj_resetWASPCache(mjWASPCache* cache, int n, int m, mjtByte identity_basis)
             for (int i=0; i < n; i++) {cache->Delta_X[i*n+i] = 1.0;}
         }
         else {
-            srand(20250810);
+            // uncomment to fix the seed for debugging
+            //srand(20250810);
             mjtNum* M = (mjtNum*)mju_malloc(sizeof(mjtNum)*n*n);
             for (int i = 0; i < n*n; i++) {
                 M[i] = (double)rand() / RAND_MAX;  // Random values between 0 and 1
