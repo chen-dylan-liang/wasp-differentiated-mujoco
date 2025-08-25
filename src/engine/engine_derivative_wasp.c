@@ -118,10 +118,10 @@ static int inRange(const mjtNum x1, const mjtNum x2, const mjtNum* range) {
 static void waspUpdate(mjData* d, mjtNum* res, mjWASPCache* cache, int m, int n){
     size_t i = cache->i;
     mjtNum* tmp =  mj_stackAllocNum(d, n*m);
-    mju_mulMatMatT(res, cache->C1+i*n*n, cache->F_hat, n, n, m);
+    mju_mulMatMat(res, cache->C1+i*n*n, cache->F_hat_T, n, n, m);
     mju_mulMatMatT(tmp, cache->C2+i*n, cache->fi, n, 1, m);
     mju_addToMat(res, tmp, n, m);
-    mju_mulMatTMat(cache->F_hat, res, cache->Delta_X, n,m,n);
+    mju_mulMatTMat(cache->F_hat_T, cache->Delta_X, res, n,n,m);
     cache->i = (i+1)%n;
 }
 
@@ -197,7 +197,7 @@ static void mjd_stepWASPDu(const mjModel* m,
         // difference states
         mjtByte y_accurate=1, s_accurate=1;
         if (y_cache) {
-            mju_copy(y_fi, y_cache->fi, 2*m->nv+m->na);
+            mju_copy(y_fi, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
             clampedStateDiff(m, y_cache->fi, next, nudge_fwd ? next_plus : NULL,
                            nudge_back ? next_minus : NULL, eps);
             waspUpdate(d, y_res, y_cache, 2*m->nv+m->na, m->nu);
@@ -206,7 +206,7 @@ static void mjd_stepWASPDu(const mjModel* m,
 
         // difference sensors
         if (s_cache) {
-            mju_copy(s_fi, s_cache->fi, m->nsensordata);
+            mju_copy(s_fi, s_cache->F_hat_T+(s_cache->i)*(m->nsensordata), m->nsensordata);
             clampedDiff(s_cache->fi, sensor, nudge_fwd ? sensor_plus : NULL,
                         nudge_back ? sensor_minus : NULL, eps,  m->nsensordata);
             waspUpdate(d, s_res, s_cache, m->nsensordata, m->nu);
@@ -269,7 +269,7 @@ static void mjd_stepWASPDv(const mjModel* m,
     // difference states
     mjtByte y_accurate=1, s_accurate=1;
     if (y_cache) {
-        mju_copy(y_fi, y_cache->fi, 2*m->nv+m->na);
+        mju_copy(y_fi, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
         if (!flg_centered) {
             stateDiff(m, y_cache->fi, next, next_plus, eps);
         } else {
@@ -281,7 +281,7 @@ static void mjd_stepWASPDv(const mjModel* m,
 
     // difference sensors
     if (s_cache) {
-        mju_copy(s_fi, s_cache->fi, m->nsensordata);
+        mju_copy(s_fi, s_cache->F_hat_T+(s_cache->i)*(m->nsensordata), m->nsensordata);
         if (!flg_centered) {
             diff(s_cache->fi, sensor, sensor_plus, eps, m->nsensordata);
         } else {
@@ -350,7 +350,7 @@ static void mjd_stepWASPDa(const mjModel* m,
     // difference states
     mjtByte y_accurate=1, s_accurate=1;
     if (y_cache) {
-        mju_copy(y_fi, y_cache->fi, 2*m->nv+m->na);
+        mju_copy(y_fi, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
         if (!flg_centered) {
             stateDiff(m, y_cache->fi, next, next_plus, eps);
         } else {
@@ -362,7 +362,7 @@ static void mjd_stepWASPDa(const mjModel* m,
 
     // difference sensors
     if (s_cache) {
-        mju_copy(s_fi, s_cache->fi, m->nsensordata);
+        mju_copy(s_fi, s_cache->F_hat_T+(s_cache->i)*(m->nsensordata), m->nsensordata);
         if (!flg_centered) {
             diff(s_cache->fi, sensor, sensor_plus, eps, m->nsensordata);
         } else {
@@ -419,7 +419,7 @@ static void mjd_stepWASPDq(const mjModel* m,
     // difference states
         mjtByte y_accurate=1, s_accurate=1;
     if (y_cache) {
-        mju_copy(y_fi, y_cache->fi, 2*m->nv+m->na);
+        mju_copy(y_fi, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
         if (!flg_centered) {
             stateDiff(m, y_cache->fi, next, next_plus, eps);
         } else {
@@ -431,7 +431,7 @@ static void mjd_stepWASPDq(const mjModel* m,
 
     // difference sensors
     if (s_cache) {
-        mju_copy(s_fi, s_cache->fi, m->nsensordata);
+        mju_copy(s_fi, s_cache->F_hat_T+(s_cache->i)*(m->nsensordata), m->nsensordata);
         if (!flg_centered) {
             diff(s_cache->fi, sensor, sensor_plus, eps, m->nsensordata);
         } else {
@@ -629,8 +629,8 @@ void mj_deleteWASPCache(mjWASPCache* cache) {
         cache -> C1 = NULL;
         mju_free(cache->C2);
         cache -> C2 = NULL;
-        mju_free(cache->F_hat);
-        cache -> F_hat = NULL;
+        mju_free(cache->F_hat_T);
+        cache -> F_hat_T = NULL;
         mju_free(cache->fi);
         cache -> fi = NULL;
         mju_free(cache);
@@ -643,7 +643,7 @@ mjWASPCache* mj_newWASPCache(int n, int m, mjtByte reset_basis, mjtByte identity
     cache -> Delta_X = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
     cache -> C1  = (mjtNum*) mju_malloc(n*n*n*sizeof(mjtNum));
     cache -> C2 = (mjtNum*) mju_malloc(n*n*sizeof(mjtNum));
-    cache -> F_hat = (mjtNum*) mju_malloc(m*n*sizeof(mjtNum));
+    cache -> F_hat_T = (mjtNum*) mju_malloc(n*m*sizeof(mjtNum));
     cache -> fi = (mjtNum*) mju_malloc(m*sizeof(mjtNum));
     mj_zeroWASPCache(cache, n, m);
     if (reset_basis) mj_resetWASPCacheBasis(cache, n, identity_basis);
@@ -653,7 +653,7 @@ mjWASPCache* mj_newWASPCache(int n, int m, mjtByte reset_basis, mjtByte identity
 // zero wasp cache (zero Fhat, fi, and i)
 void mj_zeroWASPCache(mjWASPCache* cache, int n, int m) {
     cache->i=0;
-    mju_zero(cache->F_hat,  m*n);
+    mju_zero(cache->F_hat_T,  n*m);
     mju_zero(cache->fi, m);
 }
 

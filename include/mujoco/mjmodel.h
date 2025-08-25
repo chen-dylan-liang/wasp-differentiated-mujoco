@@ -589,7 +589,7 @@ typedef struct mjWASPCache_{
     mjtNum* Delta_X;
     mjtNum* C1;
     mjtNum* C2;
-    mjtNum* F_hat;
+    mjtNum* F_hat_T;
     mjtNum* fi;
     size_t i;
 } mjWASPCache;
