@@ -74,7 +74,7 @@ static void clampedDiff(mjtNum* dx, const mjtNum* x, const mjtNum* x_plus, const
     }
 }
 
-static mjtByte closeEnough(const mjtNum* a, const mjtNum* b, int n, mjtNum dell, mjtNum dtheta, const mjWASPCache* cache, int cache_n, int cache_m){
+static mjtByte closeEnough(const mjtNum* a, const mjtNum* b, int n, mjtNum dell, mjtNum dtheta){
     mjtNum dot = mju_dot(a, b, n);
     mjtNum a_norm = mju_norm(a, n);
     mjtNum b_norm = mju_norm(b, n);
