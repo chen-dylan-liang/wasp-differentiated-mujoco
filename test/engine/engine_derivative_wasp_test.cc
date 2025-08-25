@@ -153,7 +153,7 @@ void printWASPCache(const mjWASPCache* cache, int n, int m, bool print_x) {
     PrintMatrix(cache->C2,n,n);
   }
   std::cout<<"F_hat:"<<std::endl;
-  PrintMatrix(cache->F_hat,m,n);
+  PrintMatrix(cache->F_hat_T,n,m);
   std::cout<<"fi:"<<std::endl;
   PrintMatrix(cache->fi,m,1);
 }
