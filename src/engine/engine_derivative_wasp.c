@@ -453,7 +453,7 @@ static void mjd_stepWASPDq(const mjModel* m,
 //   d(x_next) = A*Dx + B*Du
 //   d(sensor) = C*Dx + D*Du
 //   required output matrix dimensions:
-//      nx = nq + nv + na (position + velocity + activation)
+//      ndx = nv + nv + na (position + velocity + activation)
 //      A: model Jacobian wrt state, (nx * nx)
 //      B: model Jacobian wrt control, (nx * nu)
 //      C: sensor Jacobian wrt state, (ns * nx)
@@ -560,7 +560,7 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
     if (DyDq || DsDq) mjd_stepWASPDq(m, fullstate, next, sensor,
                                      d,
                                      eps, flg_centered, skipsensor, restore_spec,
-                                     q_dtheta, q_dell ,mju_min(q_max_n,nq),
+                                     q_dtheta, q_dell ,mju_min(q_max_n,nv),
                                      next_plus, next_minus, sensor_plus, sensor_minus, AT, CT,
                                      y_fi, s_fi,
                                      DyDq, DsDq);
