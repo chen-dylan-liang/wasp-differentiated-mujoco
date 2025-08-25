@@ -527,7 +527,7 @@ TEST_F(DerivativeWASPTest, ClampedCtrlDerivativesWASP) {
     //PrintMatrix(B_WASP, 2*nv, nu);
     std::cout<<"Finished comparing results for B limit1."<<std::endl;
     // ctrl remains at limits, request central differences
-    mj_zeroWASPCache(DyDu, 0, 2*nv);
+    mj_zeroWASPCache(DyDu, nu, 2*nv);
     //mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
     mjd_transitionWASP(model, data, eps, /*centered=0*/
                        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,
@@ -542,7 +542,7 @@ TEST_F(DerivativeWASPTest, ClampedCtrlDerivativesWASP) {
   data->ctrl[0] = 2;
   data->ctrl[1] = -2;
   //printWASPCache(DyDu,nu ,2*nv,1);
-  mj_zeroWASPCache(DyDu, 0, 2*nv);
+  mj_zeroWASPCache(DyDu, nu, 2*nv);
   //mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
   //printWASPCache(DyDu,nu ,2* nu,1);
   mjd_transitionWASP(model, data, eps, /*centered=0*/
@@ -558,7 +558,7 @@ TEST_F(DerivativeWASPTest, ClampedCtrlDerivativesWASP) {
   std::cout<<"Finished comparing results for control before and after."<<std::endl;
 
   // ctrl remains beyond limits, request centered differences
-  mj_zeroWASPCache(DyDu, 0, 2*nv);
+  mj_zeroWASPCache(DyDu, nu, 2*nv);
   //mj_resetWASPCache(DyDu, nu, 2 * nv, use_wasp_identity_basis);
   mjd_transitionWASP(model, data, eps, /*centered=0*/
                      1, 0, 0, 0, 0, 0, 0, 0, 0, 0, tol, tol, nu, nullptr,

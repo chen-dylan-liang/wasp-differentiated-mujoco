@@ -1342,7 +1342,7 @@ MJAPI void mj_deleteWASPCache(mjWASPCache* cache);
 MJAPI mjWASPCache* mj_newWASPCache(int n, int m, mjtByte reset_basis, mjtByte identity_basis);
 
 
-// zero wasp cache
+// zero wasp cache (zero Fhat, fi, and i)
 MJAPI void mj_zeroWASPCache(mjWASPCache* cache, int n, int m);
 
 // Finite differenced Jacobians of (force, sensors) = mj_inverse(state, acceleration)

@@ -603,7 +603,7 @@ void mj_resetWASPCacheBasis(mjWASPCache* cache, int n, mjtByte identity_basis) {
           mju_mulMatMatT(tmp, cache->C2+i*n, cache->C2+i*n, n,1,n);
           // set to identity
           mju_zero(I, n*n);
-          for (int j=0; j<n; j++) {I[j*n+j]=1;}
+          for (int j=0; j<n; j++) {I[j*n+j]=1.0;}
           mju_subFrom(I, tmp, n*n);
           mju_mulMatMat(cache->C1+i*n*n, I, cache->Delta_X, n, n,n);
         }
@@ -650,18 +650,10 @@ mjWASPCache* mj_newWASPCache(int n, int m, mjtByte reset_basis, mjtByte identity
     return cache;
 }
 
-// zero wasp cache
+// zero wasp cache (zero Fhat, fi, and i)
 void mj_zeroWASPCache(mjWASPCache* cache, int n, int m) {
     cache->i=0;
-    if (n>0) {
-        mju_zero(cache->Delta_X,  n*n);
-        mju_zero(cache->C1, n*n*n);
-        mju_zero(cache->C2,  n*n);
-    }
-    if (m>0) {
-        mju_zero(cache->F_hat,  m*n);
-        mju_zero(cache->fi, m);
-    }
-
+    mju_zero(cache->F_hat,  m*n);
+    mju_zero(cache->fi, m);
 }
 

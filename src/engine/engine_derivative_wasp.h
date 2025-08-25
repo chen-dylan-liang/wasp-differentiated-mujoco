@@ -28,7 +28,7 @@ extern "C" {
     // allocate wasp cache
     MJAPI mjWASPCache* mj_newWASPCache(int n, int m, mjtByte reset_basis, mjtByte identity_basis);
 
-    // zero wasp cache
+    // zero wasp cache (zero Fhat, fi, and i)
     MJAPI void mj_zeroWASPCache(mjWASPCache* cache, int n, int m);
 
 
