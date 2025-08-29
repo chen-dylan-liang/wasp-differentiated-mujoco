@@ -509,26 +509,26 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
     unsigned int restore_spec = mjSTATE_FULLPHYSICS | mjSTATE_CTRL;
     restore_spec |= mjDISABLED(mjDSBL_WARMSTART) ? 0 : mjSTATE_WARMSTART;
 
-  //  mj_markStack(d);
+   mj_markStack(d);
 
 
 
-    mjtNum *fullstate  = (mjtNum*)mju_malloc(sizeof(mjtNum)*mj_stateSize(m, restore_spec));//mj_stackAllocNum(d, mj_stateSize(m, restore_spec));
-    mjtNum *state      = (mjtNum*)mju_malloc(sizeof(mjtNum)*(nq+nv+na));//mj_stackAllocNum(d, nq+nv+na);  // current state
-    mjtNum *next       = (mjtNum*)mju_malloc(sizeof(mjtNum)*(nq+nv+na));//mj_stackAllocNum(d, nq+nv+na);  // next state
+    mjtNum *fullstate  = mj_stackAllocNum(d, mj_stateSize(m, restore_spec));
+    mjtNum *state      = mj_stackAllocNum(d, nq+nv+na);  // current state
+    mjtNum *next       = mj_stackAllocNum(d, nq+nv+na);  // next state
 
 
-    mjtNum *sensor       = skipsensor ? NULL : (mjtNum*)mju_malloc(sizeof(mjtNum)*ns);/// mj_stackAllocNum(d, ns);  // sensor values
+    mjtNum *sensor       = skipsensor ? NULL :  mj_stackAllocNum(d, ns);  // sensor values
 
     // controls
-    mjtNum *ctrl = (mjtNum*)mju_malloc(sizeof(mjtNum)*nu);///mj_stackAllocNum(d, nu);
+    mjtNum *ctrl = mj_stackAllocNum(d, nu);
 
 
     mjtNum* AT=NULL, *BT=NULL, *CT=NULL, *DT=NULL;
-    if (A) AT = (mjtNum*)mju_malloc(sizeof(mjtNum)*(ndx*ndx));///mj_stackAllocNum(d, ndx*ndx);
-    if (B) BT = (mjtNum*)mju_malloc(sizeof(mjtNum)*(nu*ndx));///mj_stackAllocNum(d, nu*ndx);
-    if (C) CT = (mjtNum*)mju_malloc(sizeof(mjtNum)*(ndx*ns));///mj_stackAllocNum(d, ndx*ns);
-    if (D) DT = (mjtNum*)mju_malloc(sizeof(mjtNum)*(nu*ns));///mj_stackAllocNum(d, nu*ns);
+    if (A) AT = mj_stackAllocNum(d, ndx*ndx);
+    if (B) BT = mj_stackAllocNum(d, nu*ndx);
+    if (C) CT = mj_stackAllocNum(d, ndx*ns);
+    if (D) DT = mj_stackAllocNum(d, nu*ns);
     // save current inputs
     mj_getState(m, d, fullstate, restore_spec);
     mju_copy(ctrl, d->ctrl, nu);
@@ -581,16 +581,8 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
     if (B) mju_transpose(B, BT, nu, ndx);
     if (C) mju_transpose(C, CT, ndx, ns);
     if (D) mju_transpose(D, DT, nu, ns);
-    mju_free(DT);
-    mju_free(BT);
-    mju_free(CT);
-    mju_free(AT);
-    mju_free(ctrl);
-    mju_free(sensor);
-    mju_free(next);
-    mju_free(state);
-    mju_free(fullstate);
-    //mj_freeStack(d);
+
+    mj_freeStack(d);
 }
 
 // reset wasp cache basis
