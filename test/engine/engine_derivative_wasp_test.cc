@@ -24,6 +24,7 @@
 #include "src/engine/engine_util_blas.h"
 #include "src/engine/engine_util_errmem.h"
 #include "test/fixture.h"
+#include "user/user_util.h"
 
 namespace mujoco {
 namespace {
@@ -318,24 +319,26 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
   mjtNum eps = 1e-6, tol = 1e-10;
   mjtNum *A_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * 2 * nv);
   mjtNum *B_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * nu);
+  mjtNum *AT_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * 2 * nv);
+  mjtNum *BT_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * nu);
   mjWASPCache *DyDq = mj_newWASPCache(nv, 2 * nv, 1,use_wasp_identity_basis);
   mjWASPCache *DyDv = mj_newWASPCache(nv, 2 * nv, 1,use_wasp_identity_basis);
   mjWASPCache *DyDu = mj_newWASPCache(nu, 2 * nv, 1, use_wasp_identity_basis);
   // printWASPCache(DyDq, nv, 2*nv,true);
- mjd_transitionWASP(model, data, eps, /*centered=0*/
+/* mjd_transitionWASP(model, data, eps, /*centered=0
                      0, tol, tol, nv, tol, tol, nv, 0, 0, 0, tol, tol, nu,
                      A_WASP, B_WASP, nullptr, nullptr, DyDq, DyDv, nullptr,
-                     DyDu, nullptr, nullptr, nullptr, nullptr);
-/*
+                     DyDu, nullptr, nullptr, nullptr, nullptr);*/
+
   mjd_transitionWASPOneThread(model, data, eps, 0,
-    tol,tol, nu, B_WASP, DyDu, mjDyDu);
+    tol,tol, nu, BT_WASP, DyDu, mjDyDu);
 
 
   mjd_transitionWASPOneThread(model, data, eps, 0,
-    tol,tol, nv, A_WASP+nv*(2*nv), DyDv, mjDyDv);
+    tol,tol, nv, AT_WASP+nv*(2*nv), DyDv, mjDyDv);
 
   mjd_transitionWASPOneThread(model, data, eps, 0,
-    tol,tol, nv, A_WASP, DyDq, mjDyDq);*/
+    tol,tol, nv, AT_WASP, DyDq, mjDyDq);
   // uncomment for debugging:
   //std::cout<<"DyDq:"<<std::endl;
  //printWASPCache(DyDq, nv, 2*nv, false);
@@ -347,10 +350,12 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
   //printWASPCache(DyDu, nu, 2*nv, false);
   //std::cout<<"B_wasp:"<<std::endl;
   //PrintMatrix(B_WASP, 2*nv, nu);
-  //CompareMatrices(A_WASP, A, 2 * nv, 2 * nv, tol);
-  //std::cout<<"Finished comparing results for A."<<std::endl;
-  //CompareMatrices(B_WASP, B, 2 * nv, nu, tol);
-  //std::cout<<"Finished comparing results for B."<<std::endl;
+  mju_transpose(A_WASP, AT_WASP, 2*nv, 2*nv);
+  mju_transpose(B_WASP, BT_WASP, nu, 2*nv);
+  CompareMatrices(A_WASP, A, 2 * nv, 2 * nv, tol);
+  std::cout<<"Finished comparing results for A."<<std::endl;
+  CompareMatrices(B_WASP, B, 2 * nv, nu, tol);
+  std::cout<<"Finished comparing results for B."<<std::endl;
 
   // central differenced A and B
   mjtNum *A_WASPc = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * 2 * nv);
@@ -385,6 +390,8 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
   mju_free(A_WASPc);
   mju_free(B_WASP);
   mju_free(A_WASP);
+  mju_free(BT_WASP);
+  mju_free(AT_WASP);
   mju_free(B);
   mju_free(A);
   mj_deleteWASPCache(DyDuc);
@@ -439,15 +446,27 @@ TEST_F(DerivativeWASPTest, SensorDerivativesWASP) {
   mjtNum eps = 1e-6, tol = 1e-10;
   mjtNum *C_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * ns * 2 * nv);
   mjtNum *D_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * ns * nu);
+  mjtNum *CT_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * ns * 2 * nv);
+  mjtNum *DT_WASP = (mjtNum *)mju_malloc(sizeof(mjtNum) * ns * nu);
   mjWASPCache *DsDq = mj_newWASPCache(nv, ns, 1, use_wasp_identity_basis);
   mjWASPCache *DsDv = mj_newWASPCache(nv, ns, 1, use_wasp_identity_basis);
   mjWASPCache *DsDa = nullptr;//mj_newWASPCache(model->na, ns, use_wasp_identity_basis);
   mjWASPCache *DsDu = mj_newWASPCache(nu, ns, 1, use_wasp_identity_basis);
+  mjd_transitionWASPOneThread(model, data, eps, 0,
+      tol,tol, nu, DT_WASP, DsDu, mjDsDu);
 
-  mjd_transitionWASP(model, data, eps, /*centered=0*/
+
+  mjd_transitionWASPOneThread(model, data, eps, 0,
+    tol,tol, nv, CT_WASP+nv*ns, DsDv, mjDsDv);
+
+  mjd_transitionWASPOneThread(model, data, eps, 0,
+    tol,tol, nv, CT_WASP, DsDq, mjDsDq);
+  mju_transpose(C_WASP, CT_WASP, 2*nv, ns);
+  mju_transpose(D_WASP, DT_WASP, nu, ns);
+  /*mjd_transitionWASP(model, data, eps, /*centered=0
                      0, tol, tol, nv, tol, tol, nv, tol, tol, model->na, tol,
                      tol, nu, nullptr, nullptr, C_WASP, D_WASP, nullptr,
-                     nullptr, nullptr, nullptr, DsDq, DsDv, nullptr, DsDu);
+                     nullptr, nullptr, nullptr, DsDq, DsDv, nullptr, DsDu);*/
   // compare expected and actual values
   // uncomment for debugging:
 
@@ -469,6 +488,8 @@ TEST_F(DerivativeWASPTest, SensorDerivativesWASP) {
 
   mju_free(D_WASP);
   mju_free(C_WASP);
+  mju_free(DT_WASP);
+  mju_free(CT_WASP);
   mj_deleteWASPCache(DsDu);
   mj_deleteWASPCache(DsDa);
   mj_deleteWASPCache(DsDv);
