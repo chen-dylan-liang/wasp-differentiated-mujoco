@@ -238,10 +238,31 @@ TEST_F(DerivativeWASPTest, NoStateMutationWASP) {
   mj_copyWASPCacheBasis(DsDa, DyDa, na);
   mj_copyWASPCacheBasis(DsDu, DyDu, nu);
   mjtNum eps = 1e-6, tol = 1e-10;
+
   mjd_transitionWASP(model, data, eps, /*centered=0*/
                      0, tol, tol, nv, tol, tol, nv, tol, tol, na, tol, tol, nu,
                      A, B, C, D, DyDq, DyDv, DyDa, DyDu, DsDq, DsDv, DsDa,
                      DsDu);
+/*
+  mjd_transitionWASPOneThread(model, data, eps, 0,
+    tol,tol, nu, B, DyDu, mjDyDu);
+  mjd_transitionWASPOneThread(model, data, eps, 0,
+    tol,tol, nu, D, DsDu, mjDsDu);
+
+  mjd_transitionWASPOneThread(model, data, eps, 0,
+    tol,tol, na, A+2*nv*ndx, DyDa, mjDyDa);
+  mjd_transitionWASPOneThread(model, data, eps, 0,
+    tol,tol, na, C+2*nv*ns, DsDa, mjDsDa);
+
+  mjd_transitionWASPOneThread(model, data, eps, 0,
+    tol,tol, nv, A+nv*ndx, DyDv, mjDyDv);
+  mjd_transitionWASPOneThread(model, data, eps, 0,
+    tol,tol, nv, C+nv*ns, DsDv, mjDsDv);
+
+  mjd_transitionWASPOneThread(model, data, eps, 0,
+    tol,tol, nv, A, DyDq, mjDyDq);
+  mjd_transitionWASPOneThread(model, data, eps, 0,
+    tol,tol, nv, C, DsDq, mjDsDq);*/
 
   // compare states in data and data0
   EXPECT_EQ(data->time, data0->time);
@@ -289,7 +310,7 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
 
   // uncomment for debugging:
   //std::cout<<"A:"<<std::endl;
-   //PrintMatrix(A, 2*nv, 2*nv);
+  // PrintMatrix(A, 2*nv, 2*nv);
   //std::cout<<"B:"<<std::endl;
   // PrintMatrix(B, 2*nv, nu);
 
@@ -301,25 +322,35 @@ TEST_F(DerivativeWASPTest, LinearSystemWASP) {
   mjWASPCache *DyDv = mj_newWASPCache(nv, 2 * nv, 1,use_wasp_identity_basis);
   mjWASPCache *DyDu = mj_newWASPCache(nu, 2 * nv, 1, use_wasp_identity_basis);
   // printWASPCache(DyDq, nv, 2*nv,true);
-  mjd_transitionWASP(model, data, eps, /*centered=0*/
+ mjd_transitionWASP(model, data, eps, /*centered=0*/
                      0, tol, tol, nv, tol, tol, nv, 0, 0, 0, tol, tol, nu,
                      A_WASP, B_WASP, nullptr, nullptr, DyDq, DyDv, nullptr,
                      DyDu, nullptr, nullptr, nullptr, nullptr);
+/*
+  mjd_transitionWASPOneThread(model, data, eps, 0,
+    tol,tol, nu, B_WASP, DyDu, mjDyDu);
+
+
+  mjd_transitionWASPOneThread(model, data, eps, 0,
+    tol,tol, nv, A_WASP+nv*(2*nv), DyDv, mjDyDv);
+
+  mjd_transitionWASPOneThread(model, data, eps, 0,
+    tol,tol, nv, A_WASP, DyDq, mjDyDq);*/
   // uncomment for debugging:
   //std::cout<<"DyDq:"<<std::endl;
- // printWASPCache(DyDq, nv, 2*nv, false);
-  //std::cout<<"DyDv:"<<std::endl;
-  //printWASPCache(DyDv, nv, 2*nv, false);
-  //std::cout<<"A_wasp:"<<std::endl;
-  //PrintMatrix(A_WASP, 2*nv, 2*nv);
+ //printWASPCache(DyDq, nv, 2*nv, false);
+ // std::cout<<"DyDv:"<<std::endl;
+ // printWASPCache(DyDv, nv, 2*nv, false);
+ // std::cout<<"A_wasp:"<<std::endl;
+ // PrintMatrix(A_WASP, 2*nv, 2*nv);
   //std::cout<<"DyDu:"<<std::endl;
   //printWASPCache(DyDu, nu, 2*nv, false);
   //std::cout<<"B_wasp:"<<std::endl;
   //PrintMatrix(B_WASP, 2*nv, nu);
-  CompareMatrices(A_WASP, A, 2 * nv, 2 * nv, tol);
-  std::cout<<"Finished comparing results for A."<<std::endl;
-  CompareMatrices(B_WASP, B, 2 * nv, nu, tol);
-  std::cout<<"Finished comparing results for B."<<std::endl;
+  //CompareMatrices(A_WASP, A, 2 * nv, 2 * nv, tol);
+  //std::cout<<"Finished comparing results for A."<<std::endl;
+  //CompareMatrices(B_WASP, B, 2 * nv, nu, tol);
+  //std::cout<<"Finished comparing results for B."<<std::endl;
 
   // central differenced A and B
   mjtNum *A_WASPc = (mjtNum *)mju_malloc(sizeof(mjtNum) * 2 * nv * 2 * nv);

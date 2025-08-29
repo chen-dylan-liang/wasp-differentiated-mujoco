@@ -575,9 +575,8 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
 
 void mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByte flg_centered,
                                  mjtNum dtheta, mjtNum dell, int max_n,
-                                 mjtNum *deriv,
+                                 mjtNum *derivT,
                                  mjWASPCache *cache, mjPartialDerivativeType type) {
-    if (!deriv||!cache) return;
 
     if (m->opt.integrator == mjINT_RK4) {
         mjERROR("RK4 integrator is not supported");
@@ -593,6 +592,7 @@ void mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByt
     restore_spec |= mjDISABLED(mjDSBL_WARMSTART) ? 0 : mjSTATE_WARMSTART;
 
     mjtNum *fullstate  = mj_stackAllocNum(d, mj_stateSize(m, restore_spec));
+    // Remove the debug printf
     mjtNum *state      = mj_stackAllocNum(d, nq+nv+na);  // current state
     mjtNum *next       = mj_stackAllocNum(d, nq+nv+na);  // next state
     mjtNum *next_plus  = mj_stackAllocNum(d, nq+nv+na);  // forward-nudged next state
@@ -621,102 +621,93 @@ void mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByt
     // restore input
     mj_setState(m, d, fullstate, restore_spec);
 
-    mjtNum* derivT=NULL;
+
     mjtNum* fi = (type==mjDsDq||type==mjDsDv||type==mjDsDa||type==mjDsDu)?mj_stackAllocNum(d, ns): mj_stackAllocNum(d, ndx);
     switch (type) {
         case mjDyDu:
-            derivT=mj_stackAllocNum(d, nu*ndx);
             mjd_stepWASPDu(m, fullstate, next, sensor, ctrl,
                                     d,
                                     eps, flg_centered, skipsensor, restore_spec,
                                     dtheta, dell ,mju_min(max_n,nu),
-                                    next_plus, next_minus, sensor_plus, sensor_minus, derivT, NULL,
+                                    next_plus, next_minus, sensor_plus, sensor_minus,
+                                    derivT, NULL,
                                     fi, NULL,
                                     cache, NULL);
-            mju_transpose(deriv, derivT, nu, ndx);
             break;
         case mjDyDv:
-            derivT=mj_stackAllocNum(d, nv*ndx);
             mjd_stepWASPDv(m, fullstate, next, sensor,
                                    d,
                                    eps, flg_centered, skipsensor, restore_spec,
                                    dtheta, dell ,mju_min(max_n,nv),
-                                   next_plus, next_minus, sensor_plus, sensor_minus, derivT, NULL,
+                                   next_plus, next_minus, sensor_plus, sensor_minus,
+                                   derivT, NULL,
                                    fi, NULL,
                                    cache, NULL);
-            mju_transpose(deriv, derivT, nv, ndx);
             break;
         case mjDyDa:
-            derivT=mj_stackAllocNum(d, na*ndx);
-            mju_transpose(deriv, derivT, na, ndx);
             mjd_stepWASPDa(m, fullstate, next, sensor,
                                    d,
                                    eps, flg_centered, skipsensor, restore_spec,
                                    dtheta, dell ,mju_min(max_n,na),
-                                   next_plus, next_minus, sensor_plus, sensor_minus, derivT, NULL,
+                                   next_plus, next_minus, sensor_plus, sensor_minus,
+                                   derivT, NULL,
                                    fi, NULL,
                                    cache, NULL);
             break;
         case mjDyDq:
-            derivT=mj_stackAllocNum(d, nv*ndx);
-            mju_transpose(deriv, derivT, nv, ndx);
             mjd_stepWASPDq(m, fullstate, next, sensor,
                                  d,
                                  eps, flg_centered, skipsensor, restore_spec,
                                  dtheta, dell ,mju_min(max_n,nv),
-                                 next_plus, next_minus, sensor_plus, sensor_minus, derivT, NULL,
+                                 next_plus, next_minus, sensor_plus, sensor_minus,
+                                 derivT, NULL,
                                  fi, NULL,
                                  cache, NULL);
             break;
         case mjDsDu:
-            derivT=mj_stackAllocNum(d, nu*ns);
-            mju_transpose(deriv, derivT, nu, ns);
             mjd_stepWASPDu(m, fullstate, next, sensor, ctrl,
                                      d,
                                      eps, flg_centered, skipsensor, restore_spec,
                                      dtheta, dell ,mju_min(max_n,nu),
-                                     next_plus, next_minus, sensor_plus, sensor_minus, NULL, derivT,
+                                     next_plus, next_minus, sensor_plus, sensor_minus,
+                                     NULL, derivT,
                                      NULL, fi,
                                      NULL, cache);
             break;
         case mjDsDv:
-            derivT=mj_stackAllocNum(d, nv*ns);
-            mju_transpose(deriv, derivT, nv, ns);
             mjd_stepWASPDv(m, fullstate, next, sensor,
                                      d,
                                      eps, flg_centered, skipsensor, restore_spec,
                                      dtheta, dell ,mju_min(max_n,nv),
-                                     next_plus, next_minus, sensor_plus, sensor_minus, NULL, derivT,
+                                     next_plus, next_minus, sensor_plus, sensor_minus,
+                                     NULL, derivT,
                                      NULL, fi,
                                      NULL, cache);
             break;
         case mjDsDa:
-            derivT=mj_stackAllocNum(d, na*ns);
-            mju_transpose(deriv, derivT, na, ns);
             mjd_stepWASPDa(m, fullstate, next, sensor,
                                    d,
                                    eps, flg_centered, skipsensor, restore_spec,
                                    dtheta, dell ,mju_min(max_n,na),
-                                   next_plus, next_minus, sensor_plus, sensor_minus, NULL, derivT,
-                                     NULL, fi,
-                                     NULL, cache);
+                                   next_plus, next_minus, sensor_plus, sensor_minus,
+                                   NULL, derivT,
+                                   NULL, fi,
+                                   NULL, cache);
             break;
         //case mjDsDq:
          default:
-            derivT=mj_stackAllocNum(d, nv*ns);
-            mju_transpose(deriv, derivT, nv, ns);
             mjd_stepWASPDq(m, fullstate, next, sensor,
                                  d,
                                  eps, flg_centered, skipsensor, restore_spec,
                                  dtheta, dell ,mju_min(max_n,nv),
-                                 next_plus, next_minus, sensor_plus, sensor_minus, NULL, derivT,
-                                     NULL, fi,
-                                     NULL, cache);
+                                 next_plus, next_minus, sensor_plus, sensor_minus,
+                                 NULL, derivT,
+                                 NULL, fi,
+                                 NULL, cache);
             break;
     }
     mj_freeStack(d);
 }
-
 
 // reset wasp cache basis
 void mj_resetWASPCacheBasis(mjWASPCache *cache, int n, mjtByte identity_basis) {
