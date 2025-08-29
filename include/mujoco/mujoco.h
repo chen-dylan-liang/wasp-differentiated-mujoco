@@ -1329,6 +1329,12 @@ MJAPI void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte f
                         mjWASPCache* DsDq_cache, mjWASPCache* DsDv_cache, mjWASPCache* DsDa_cache,
                         mjWASPCache* DsDu_cache);
 
+
+// per thread wasp differenced transition matrices (control theory notation)
+MJAPI void mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByte flg_centered,
+                                  mjtNum dtheta, mjtNum dell, int max_n,
+                                  mjtNum *deriv,
+                                  mjWASPCache *cache, mjPartialDerivativeType type);
 // reset wasp cache basis
 MJAPI void mj_resetWASPCacheBasis(mjWASPCache* cache, int n, mjtByte identity_basis);
 
