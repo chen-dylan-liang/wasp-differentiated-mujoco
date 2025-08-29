@@ -577,6 +577,7 @@ void mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByt
                                  mjtNum dtheta, mjtNum dell, int max_n,
                                  mjtNum *deriv,
                                  mjWASPCache *cache, mjPartialDerivativeType type) {
+    if (!deriv||!cache) return;
 
     if (m->opt.integrator == mjINT_RK4) {
         mjERROR("RK4 integrator is not supported");
