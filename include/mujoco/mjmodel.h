@@ -594,6 +594,11 @@ typedef struct mjWASPCache_{
     size_t i;
 } mjWASPCache;
 
+typedef enum mjPartialDerivativeType_ {
+  mjDyDq,mjDyDv,mjDyDa,mjDyDu,
+  mjDsDq,mjDsDv,mjDsDa,mjDsDu
+} mjPartialDerivativeType;
+
 
 //---------------------------------- mjModel -------------------------------------------------------
 
