@@ -568,9 +568,9 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
     if (C) {
         for (int i=0; i<ns; i++)
             for (int j=0; j<ndx; j++) {
-                if (j<nv) A[i*ndx+j] = (DsDq->DT)[j*ns+i];
-                else if (j<2*nv) A[i*ndx+j] = (DsDv->DT)[(j-nv)*ns+i];
-                else A[i*ndx+j]= (DsDa->DT)[(j-2*nv)*ns+i];
+                if (j<nv) C[i*ndx+j] = (DsDq->DT)[j*ns+i];
+                else if (j<2*nv) C[i*ndx+j] = (DsDv->DT)[(j-nv)*ns+i];
+                else C[i*ndx+j]= (DsDa->DT)[(j-2*nv)*ns+i];
             }
     }
     if (D) mju_transpose(D, DsDu->DT, nu, ns);
