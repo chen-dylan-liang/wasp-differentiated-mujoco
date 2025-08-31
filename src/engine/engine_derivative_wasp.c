@@ -135,7 +135,7 @@ static void waspSparseUpdate(mjData *d, mjWASPCache *cache, int m, int n) {
     cache->i = (i + 1) % n;
 }
 
-static void mjd_stepWASPDu(const mjModel* m,
+static int mjd_stepWASPDu(const mjModel* m,
                            const mjtNum* fullstate,
                            const mjtNum* next,
                            const mjtNum* sensor,
@@ -147,7 +147,7 @@ static void mjd_stepWASPDu(const mjModel* m,
                            mjtNum* next_plus, mjtNum* next_minus,  mjtNum* sensor_plus, mjtNum* sensor_minus,
                            mjWASPCache* y_cache, mjWASPCache* s_cache){
     mjtNum* delta_u_fwd = mj_stackAllocNum(d, m->nu), *delta_u_back=mj_stackAllocNum(d, m->nu);
-
+    int res=0;
     for(int i=0; i<max_n ;i++){
             int fwd_exceeds=0, back_exceeds=0; // =1 when there's exceeding along 1 axis
             //printf("%d of %d\n",i, max_n);
@@ -182,7 +182,7 @@ static void mjd_stepWASPDu(const mjModel* m,
                // printf("nudging forward!\n");
                 mju_addTo(d->ctrl, delta_u_fwd, m->nu);
                 // step, get nudged output
-                mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
+                mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);res++;
                 getState(m, d, next_plus, sensor_plus);
                 // reset
                 mj_setState(m, d, fullstate, restore_spec);
@@ -195,7 +195,7 @@ static void mjd_stepWASPDu(const mjModel* m,
                 //printf("nudging back!\n");
                 mju_addTo(d->ctrl, delta_u_back, m->nu);
                 // step, get nudged output
-                mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
+                mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);res++;
                 getState(m, d, next_minus, sensor_minus);
                 // reset
                 mj_setState(m, d, fullstate, restore_spec);
@@ -222,9 +222,10 @@ static void mjd_stepWASPDu(const mjModel* m,
         }
         if(y_accurate&s_accurate) break;
     }
+    return res;
 }
 
-static void mjd_stepWASPDv(const mjModel* m,
+static int mjd_stepWASPDv(const mjModel* m,
                            const mjtNum* fullstate,
                            const mjtNum* next,
                            const mjtNum* sensor,
@@ -235,6 +236,7 @@ static void mjd_stepWASPDv(const mjModel* m,
                            mjtNum* next_plus, mjtNum* next_minus,  mjtNum* sensor_plus, mjtNum* sensor_minus,
                            mjWASPCache* y_cache, mjWASPCache* s_cache){
     mjtNum* delta_v = mj_stackAllocNum(d, m->nv);
+    int res=0;
     for(int i=0; i<max_n ;i++){
     //size_t iv = y_cache?y_cache->i:s_cache->i;
     // nudge forward
@@ -248,7 +250,7 @@ static void mjd_stepWASPDv(const mjModel* m,
         mju_addTo(d->qvel, delta_v, m->nv);
 
     // step, get nudged output
-    mj_stepSkip(m, d, mjSTAGE_POS, skipsensor);
+    mj_stepSkip(m, d, mjSTAGE_POS, skipsensor);res++;
     getState(m, d, next_plus, sensor_plus);
     // reset
     mj_setState(m, d, fullstate, restore_spec);
@@ -265,7 +267,7 @@ static void mjd_stepWASPDv(const mjModel* m,
         }
         mju_addTo(d->qvel, delta_v, m->nv);
         // step, get nudged output
-        mj_stepSkip(m, d, mjSTAGE_POS, skipsensor);
+        mj_stepSkip(m, d, mjSTAGE_POS, skipsensor);res++;
         getState(m, d, next_minus, sensor_minus);
 
         // reset
@@ -298,10 +300,10 @@ static void mjd_stepWASPDv(const mjModel* m,
     }
         if(y_accurate&s_accurate) break;
     }
-
+return res;
 }
 
-static void mjd_stepWASPDa(const mjModel* m,
+static int mjd_stepWASPDa(const mjModel* m,
                            const mjtNum* fullstate,
                            const mjtNum* next,
                            const mjtNum* sensor,
@@ -312,6 +314,7 @@ static void mjd_stepWASPDa(const mjModel* m,
                            mjtNum* next_plus, mjtNum* next_minus,  mjtNum* sensor_plus, mjtNum* sensor_minus,
                            mjWASPCache* y_cache, mjWASPCache* s_cache){
     mjtNum* delta_a = mj_stackAllocNum(d, m->na);
+    int res=0;
     for(int i=0; i<max_n ;i++){
     //size_t ia = y_cache?y_cache->i:s_cache->i;
     // nudge forward
@@ -325,7 +328,7 @@ static void mjd_stepWASPDa(const mjModel* m,
         mju_addTo(d->ctrl, delta_a, m->na);
 
     // step, get nudged output
-    mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
+    mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor); res++;
     getState(m, d, next_plus, sensor_plus);
 
     // reset
@@ -344,7 +347,7 @@ static void mjd_stepWASPDa(const mjModel* m,
         mju_addTo(d->ctrl, delta_a, m->na);
 
         // step, get nudged output
-        mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);
+        mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);res++;
         getState(m, d, next_minus, sensor_minus);
 
         // reset
@@ -378,10 +381,10 @@ static void mjd_stepWASPDa(const mjModel* m,
         if(y_accurate&s_accurate) break;
     }
 
-
+    return res;
 }
 
-static void mjd_stepWASPDq(const mjModel* m,
+static int mjd_stepWASPDq(const mjModel* m,
                            const mjtNum* fullstate,
                            const mjtNum* next,
                            const mjtNum* sensor,
@@ -392,6 +395,7 @@ static void mjd_stepWASPDq(const mjModel* m,
                            mjtNum* next_plus, mjtNum* next_minus,  mjtNum* sensor_plus, mjtNum* sensor_minus,
                            mjWASPCache* y_cache, mjWASPCache* s_cache){
     mjtNum* delta_q = mj_stackAllocNum(d, m->nv);
+    int res=0;
     for(int i=0; i<max_n ;i++){
     //size_t iq = y_cache?y_cache->i:s_cache->i;
     if (y_cache) mju_copy(delta_q, y_cache->C2+y_cache->i*m->nv, m->nv);
@@ -399,7 +403,7 @@ static void mjd_stepWASPDq(const mjModel* m,
     mj_integratePos(m, d->qpos, delta_q, eps);
 
     // step, get nudged output
-    mj_stepSkip(m, d, mjSTAGE_NONE, skipsensor);
+    mj_stepSkip(m, d, mjSTAGE_NONE, skipsensor);res++;
     getState(m, d, next_plus, sensor_plus);
 
     // reset
@@ -411,7 +415,7 @@ static void mjd_stepWASPDq(const mjModel* m,
         mj_integratePos(m, d->qpos, delta_q, -eps);
 
         // step, get nudged output
-        mj_stepSkip(m, d, mjSTAGE_NONE, skipsensor);
+        mj_stepSkip(m, d, mjSTAGE_NONE, skipsensor);res++;
         getState(m, d, next_minus, sensor_minus);
 
         // reset
@@ -444,7 +448,7 @@ static void mjd_stepWASPDq(const mjModel* m,
     }
         if(y_accurate&s_accurate) break;
     }
-
+    return res;
 }
 
 
@@ -468,7 +472,7 @@ static void mjd_stepWASPDq(const mjModel* m,
 //     DsDv: (ns x nv)
 //     DsDa: (ns x na)
 //     DsDu: (ns x nu)
-void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
+int mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_centered,
                         mjtNum q_dtheta, mjtNum q_dell, int q_max_n,
                         mjtNum v_dtheta, mjtNum v_dell, int v_max_n,
                         mjtNum a_dtheta, mjtNum a_dell, int a_max_n,
@@ -520,10 +524,11 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
 
     // restore input
     mj_setState(m, d, fullstate, restore_spec);
+    int res =1;
     // the order of differentiation wrt independent variables matters for getting correct sensor derivatives
     // the order should be u->a->v->q
     // wasp-difference controls: skip=mjSTAGE_VEL, handle ctrl at range limits
-    if (DyDu || DsDu) mjd_stepWASPDu(m, fullstate, next, sensor, ctrl,
+    if (DyDu || DsDu) res+=mjd_stepWASPDu(m, fullstate, next, sensor, ctrl,
                                      d,
                                      eps, flg_centered, skipsensor, restore_spec,
                                      u_dtheta, u_dell ,mju_min(u_max_n,nu),
@@ -531,7 +536,7 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
                                      DyDu, DsDu);
 
     // wasp-difference activations: skip=mjSTAGE_VEL
-    if (DyDa || DsDa) mjd_stepWASPDa(m, fullstate, next, sensor,
+    if (DyDa || DsDa) res+=mjd_stepWASPDa(m, fullstate, next, sensor,
                                      d,
                                      eps, flg_centered, skipsensor, restore_spec,
                                      a_dtheta, a_dell ,mju_min(a_max_n,na),
@@ -539,7 +544,7 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
                                      DyDa, DsDa);
 
     // wasp-difference velocities: skip=mjSTAGE_POS
-    if (DyDv || DsDv) mjd_stepWASPDv(m, fullstate, next, sensor,
+    if (DyDv || DsDv) res+=mjd_stepWASPDv(m, fullstate, next, sensor,
                                      d,
                                      eps, flg_centered, skipsensor, restore_spec,
                                      v_dtheta, v_dell ,mju_min(v_max_n,nv),
@@ -547,7 +552,7 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
                                      DyDv, DsDv);
 
     // wasp-difference positions: skip=mjSTAGE_NONE
-    if (DyDq || DsDq) mjd_stepWASPDq(m, fullstate, next, sensor,
+    if (DyDq || DsDq) res+=mjd_stepWASPDq(m, fullstate, next, sensor,
                                      d,
                                      eps, flg_centered, skipsensor, restore_spec,
                                      q_dtheta, q_dell ,mju_min(q_max_n,nv),
@@ -576,9 +581,10 @@ void mjd_transitionWASP(const mjModel* m, mjData* d, mjtNum eps, mjtByte flg_cen
     if (D) mju_transpose(D, DsDu->DT, nu, ns);
 
     mj_freeStack(d);
+    return res;
 }
 
-void mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByte flg_centered,
+int mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByte flg_centered,
                                  mjtNum dtheta, mjtNum dell, int max_n,
                                  mjtNum *derivT,
                                  mjWASPCache *cache, mjPartialDerivativeType type) {
@@ -626,9 +632,10 @@ void mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByt
     // restore input
     mj_setState(m, d, fullstate, restore_spec);
 
+    int res = 1;
     switch (type) {
         case mjDyDu:
-            mjd_stepWASPDu(m, fullstate, next, sensor, ctrl,
+           res = mjd_stepWASPDu(m, fullstate, next, sensor, ctrl,
                                     d,
                                     eps, flg_centered, skipsensor, restore_spec,
                                     dtheta, dell ,mju_min(max_n,nu),
@@ -637,7 +644,7 @@ void mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByt
             mju_copy(derivT, cache->DT, ndx*nu);
             break;
         case mjDyDv:
-            mjd_stepWASPDv(m, fullstate, next, sensor,
+            res = mjd_stepWASPDv(m, fullstate, next, sensor,
                                    d,
                                    eps, flg_centered, skipsensor, restore_spec,
                                    dtheta, dell ,mju_min(max_n,nv),
@@ -646,7 +653,7 @@ void mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByt
             mju_copy(derivT, cache->DT, ndx*nv);
             break;
         case mjDyDa:
-            mjd_stepWASPDa(m, fullstate, next, sensor,
+            res = mjd_stepWASPDa(m, fullstate, next, sensor,
                                    d,
                                    eps, flg_centered, skipsensor, restore_spec,
                                    dtheta, dell ,mju_min(max_n,na),
@@ -655,7 +662,7 @@ void mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByt
             mju_copy(derivT, cache->DT, ndx*na);
             break;
         case mjDyDq:
-            mjd_stepWASPDq(m, fullstate, next, sensor,
+            res = mjd_stepWASPDq(m, fullstate, next, sensor,
                                  d,
                                  eps, flg_centered, skipsensor, restore_spec,
                                  dtheta, dell ,mju_min(max_n,nv),
@@ -664,7 +671,7 @@ void mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByt
             mju_copy(derivT, cache->DT, ndx*nv);
             break;
         case mjDsDu:
-            mjd_stepWASPDu(m, fullstate, next, sensor, ctrl,
+             res =mjd_stepWASPDu(m, fullstate, next, sensor, ctrl,
                                      d,
                                      eps, flg_centered, skipsensor, restore_spec,
                                      dtheta, dell ,mju_min(max_n,nu),
@@ -673,7 +680,7 @@ void mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByt
             mju_copy(derivT, cache->DT, ns*nu);
             break;
         case mjDsDv:
-            mjd_stepWASPDv(m, fullstate, next, sensor,
+             res =mjd_stepWASPDv(m, fullstate, next, sensor,
                                      d,
                                      eps, flg_centered, skipsensor, restore_spec,
                                      dtheta, dell ,mju_min(max_n,nv),
@@ -682,7 +689,7 @@ void mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByt
             mju_copy(derivT, cache->DT, ns*nv);
             break;
         case mjDsDa:
-            mjd_stepWASPDa(m, fullstate, next, sensor,
+            res = mjd_stepWASPDa(m, fullstate, next, sensor,
                                    d,
                                    eps, flg_centered, skipsensor, restore_spec,
                                    dtheta, dell ,mju_min(max_n,na),
@@ -692,7 +699,7 @@ void mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByt
             break;
         //case mjDsDq:
          default:
-            mjd_stepWASPDq(m, fullstate, next, sensor,
+            res = mjd_stepWASPDq(m, fullstate, next, sensor,
                                  d,
                                  eps, flg_centered, skipsensor, restore_spec,
                                  dtheta, dell ,mju_min(max_n,nv),
@@ -702,6 +709,7 @@ void mjd_transitionWASPOneThread(const mjModel *m, mjData *d, mjtNum eps, mjtByt
             break;
     }
     mj_freeStack(d);
+    return res;
 }
 
 // reset wasp cache basis
