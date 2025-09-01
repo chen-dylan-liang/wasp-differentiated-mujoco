@@ -52,6 +52,8 @@ extern "C" {
                                   mjtNum dtheta, mjtNum dell, int max_n,
                                   mjtNum *derivT,
                                   mjWASPCache *cache, mjPartialDerivativeType type);
+    // copy wasp cache
+    MJAPI void mj_copyWASPCache(mjWASPCache *dest, const mjWASPCache* src, int n, int m);
 
 #ifdef __cplusplus
     }
