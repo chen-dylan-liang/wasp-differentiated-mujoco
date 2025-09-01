@@ -821,3 +821,11 @@ void mj_zeroWASPCache(mjWASPCache *cache, int n, int m) {
     mju_zero(cache->fi, m);
     mju_zero(cache->fi_old, m);
 }
+
+void mj_copyWASPCache(mjWASPCache *dest, const mjWASPCache* src, int n, int m) {
+    dest->i = src->i;
+    mju_copy(dest->F_hat_T, src->F_hat_T,n * m);
+    mju_copy(dest->DT, src->DT,n * m);
+    mju_copy(dest->fi, src->fi,m);
+    mju_copy(dest->fi_old, src->fi_old,m);
+}
