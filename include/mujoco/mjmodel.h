@@ -585,10 +585,13 @@ struct mjStatistic_ {             // model statistics (in qpos0)
 typedef struct mjStatistic_ mjStatistic;
 
 //---------------------------------- mjWASPCache ---------------------------------------------------
+typedef struct mjWASPBasis_ {
+  mjtNum* Delta_X;
+  mjtNum* C1;
+  mjtNum* C2;
+} mjWASPBasis;
+
 typedef struct mjWASPCache_{
-    mjtNum* Delta_X;
-    mjtNum* C1;
-    mjtNum* C2;
     mjtNum* F_hat_T;
     mjtNum* fi;
     mjtNum* fi_old;
