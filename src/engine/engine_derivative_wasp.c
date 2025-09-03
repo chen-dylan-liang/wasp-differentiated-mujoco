@@ -204,7 +204,7 @@ static int mjd_stepWASPDu(const mjModel* m,
 
 
             // difference states
-            mjtByte y_accurate=0, s_accurate=0;
+            mjtByte y_accurate=1, s_accurate=1;
             if (y_cache) {
                 mju_copy(y_cache->fi_old, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
                 clampedStateDiff(m, y_cache->fi, next, nudge_fwd ? next_plus : NULL,
@@ -221,7 +221,7 @@ static int mjd_stepWASPDu(const mjModel* m,
                 waspSparseUpdate(basis, d, s_cache, m->nsensordata, m->nu);
               if (i>=min_n-1)   s_accurate=closeEnough(s_cache->fi_old, s_cache->fi, m->nsensordata, dell, dtheta);
             }
-            if(y_accurate&&s_accurate) break;
+            if(i>=min_n-1&&y_accurate&&s_accurate) break;
 
     }
     return res;
@@ -278,7 +278,7 @@ static int mjd_stepWASPDv(const mjModel* m,
         }
 
             // difference states
-            mjtByte y_accurate=0, s_accurate=0;
+            mjtByte y_accurate=1, s_accurate=1;
             if (y_cache) {
                 mju_copy(y_cache->fi_old, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
                 if (!flg_centered) {
@@ -301,7 +301,7 @@ static int mjd_stepWASPDv(const mjModel* m,
                 waspSparseUpdate(basis, d, s_cache, m->nsensordata,  m->nv);
                 if (i>=min_n-1) s_accurate=closeEnough(s_cache->fi_old, s_cache->fi, m->nsensordata,dell, dtheta);
             }
-            if(y_accurate&&s_accurate) break;
+            if(i>=min_n-1&&y_accurate&&s_accurate) break;
 
     }
 return res;
@@ -360,7 +360,7 @@ static int mjd_stepWASPDa(const mjModel* m,
         }
 
             // difference states
-            mjtByte y_accurate=0, s_accurate=0;
+            mjtByte y_accurate=1, s_accurate=1;
             if (y_cache) {
                 mju_copy(y_cache->fi_old, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
                 if (!flg_centered) {
@@ -383,7 +383,7 @@ static int mjd_stepWASPDa(const mjModel* m,
                 waspSparseUpdate(basis, d, s_cache, m->nsensordata, m->na);
                 if (i>=min_n-1) s_accurate=closeEnough(s_cache->fi_old, s_cache->fi, m->nsensordata,dell, dtheta);
             }
-            if(y_accurate&&s_accurate) break;
+            if(i>=min_n-1&&y_accurate&&s_accurate) break;
 
     }
     return res;
@@ -429,7 +429,7 @@ static int mjd_stepWASPDq(const mjModel* m,
         }
 
             // difference states
-            mjtByte y_accurate=0, s_accurate=0;
+            mjtByte y_accurate=1, s_accurate=1;
             if (y_cache) {
                 mju_copy(y_cache->fi_old, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
                 if (!flg_centered) {
@@ -452,7 +452,7 @@ static int mjd_stepWASPDq(const mjModel* m,
                 waspSparseUpdate(basis, d, s_cache, m->nsensordata, m->nv);
                if (i>=min_n-1) s_accurate=closeEnough(s_cache->fi_old, s_cache->fi,  m->nsensordata, dell, dtheta);
             }
-            if(y_accurate&&s_accurate) break;
+            if(i>=min_n-1&&y_accurate&&s_accurate) break;
 
     }
     return res;
