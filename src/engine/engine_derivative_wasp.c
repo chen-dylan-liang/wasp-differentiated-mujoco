@@ -145,30 +145,29 @@ static int mjd_stepWASPDu(const mjModel* m,
                            mjData* d,
                            mjtNum eps, mjtByte flg_centered,
                            int skipsensor, unsigned int restore_spec,
-                           mjtNum dtheta, mjtNum dell, int max_n,
+                           mjtNum dtheta, mjtNum dell, int min_n,
                            mjtNum* next_plus, mjtNum* next_minus,  mjtNum* sensor_plus, mjtNum* sensor_minus,
                            mjWASPCache* y_cache, mjWASPCache* s_cache){
     mjtNum* delta_u_fwd = mj_stackAllocNum(d, m->nu), *delta_u_back=mj_stackAllocNum(d, m->nu);
     int res=0;
-    for(int i=0; i<max_n ;i++){
-            int fwd_exceeds=0, back_exceeds=0; // =1 when there's exceeding along 1 axis
-            //printf("%d of %d\n",i, max_n);
-            // check whether forward exceeds limit
-            for (int j=0; j<m->nu;j++) {
-                int limited = m->actuator_ctrllimited[j];
-                delta_u_fwd[j] =  y_cache?(basis->C2+y_cache->i*m->nu)[j]*eps:(basis->C2+s_cache->i*m->nu)[j]*eps;
-               // printf("delta_u=%f\n",delta);
-                mjtNum u0 = mju_min(ctrl[j], ctrl[j]+delta_u_fwd[j]), u1=mju_max(ctrl[j], ctrl[j]+delta_u_fwd[j]);
-                if (limited&& !inRange(u0, u1, m->actuator_ctrlrange+2*j)) {
-                    delta_u_fwd[j]=0.0;
-                    fwd_exceeds=1;
-                   // printf("%d fwd exceeds\n",j);
-                }
+    for(int i=0; i<m->nu ;i++) {
+        int fwd_exceeds=0, back_exceeds=0; // =1 when there's exceeding along 1 axis
+        // check whether forward exceeds limit
+        for (int j=0; j<m->nu;j++) {
+            int limited = m->actuator_ctrllimited[j];
+            delta_u_fwd[j] =  y_cache?(basis->C2+y_cache->i*m->nu)[j]*eps:(basis->C2+s_cache->i*m->nu)[j]*eps;
+            // printf("delta_u=%f\n",delta);
+            mjtNum u0 = mju_min(ctrl[j], ctrl[j]+delta_u_fwd[j]), u1=mju_max(ctrl[j], ctrl[j]+delta_u_fwd[j]);
+            if (limited&& !inRange(u0, u1, m->actuator_ctrlrange+2*j)) {
+                delta_u_fwd[j]=0.0;
+                fwd_exceeds=1;
+                // printf("%d fwd exceeds\n",j);
             }
-            //if (y_cache) mju_printMat(y_cache->C2+y_cache->i*m->nu, 1,m->nu);
+        }
+        //if (y_cache) mju_printMat(y_cache->C2+y_cache->i*m->nu, 1,m->nu);
         //    mju_printMat(delta_u_fwd, 1, m->nu);
-           // check whether backward exceeds limit
-            for (int j=0; j<m->nu;j++) {
+        // check whether backward exceeds limit
+        for (int j=0; j<m->nu;j++) {
             int limited = m->actuator_ctrllimited[j];
             delta_u_back[j] =  y_cache?(basis->C2+y_cache->i*m->nu)[j]*(-eps):(basis->C2+s_cache->i*m->nu)[j]*(-eps);
             mjtNum u0 = mju_min(ctrl[j], ctrl[j]+delta_u_back[j]), u1=mju_max(ctrl[j], ctrl[j]+delta_u_back[j]);
@@ -180,49 +179,50 @@ static int mjd_stepWASPDu(const mjModel* m,
         }
         int nudge_fwd = !mju_isZero(delta_u_fwd, m->nu) // don't nudge forward when delta_u is all zero
         &&!(fwd_exceeds&&!back_exceeds); // fall to backward differencing when fwd exceeds but backward is accurate
-            if (nudge_fwd) {
-               // printf("nudging forward!\n");
-                mju_addTo(d->ctrl, delta_u_fwd, m->nu);
-                // step, get nudged output
-                mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);res++;
-                getState(m, d, next_plus, sensor_plus);
-                // reset
-                mj_setState(m, d, fullstate, restore_spec);
-            }
+        if (nudge_fwd) {
+            // printf("nudging forward!\n");
+            mju_addTo(d->ctrl, delta_u_fwd, m->nu);
+            // step, get nudged output
+            mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);res++;
+            getState(m, d, next_plus, sensor_plus);
+            // reset
+            mj_setState(m, d, fullstate, restore_spec);
+        }
         int nudge_back = !mju_isZero(delta_u_back, m->nu) // don't nudge backward when delta_u is all zero
         &&!(!flg_centered&&!fwd_exceeds) // no need to nudge backward when using forward differencing and forward is accurate
         // (forward differencing falls to central differencing whenever fwd exceeds)
         &&!(!fwd_exceeds&&back_exceeds); // fall to forward differencing when backward exceeds but forward is accurate
-            if (nudge_back) {
-                //printf("nudging back!\n");
-                mju_addTo(d->ctrl, delta_u_back, m->nu);
-                // step, get nudged output
-                mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);res++;
-                getState(m, d, next_minus, sensor_minus);
-                // reset
-                mj_setState(m, d, fullstate, restore_spec);
+        if (nudge_back) {
+            //printf("nudging back!\n");
+            mju_addTo(d->ctrl, delta_u_back, m->nu);
+            // step, get nudged output
+            mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);res++;
+            getState(m, d, next_minus, sensor_minus);
+            // reset
+            mj_setState(m, d, fullstate, restore_spec);
+        }
+
+        if (i>=min_n-1){
+            // difference states
+            mjtByte y_accurate=1, s_accurate=1;
+            if (y_cache) {
+                mju_copy(y_cache->fi_old, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
+                clampedStateDiff(m, y_cache->fi, next, nudge_fwd ? next_plus : NULL,
+                               nudge_back ? next_minus : NULL, eps);
+                waspSparseUpdate(basis, d, y_cache, 2*m->nv+m->na, m->nu);
+                y_accurate=closeEnough(y_cache->fi_old, y_cache->fi, 2*m->nv+m->na, dell, dtheta);
             }
 
-
-        // difference states
-        mjtByte y_accurate=1, s_accurate=1;
-        if (y_cache) {
-            mju_copy(y_cache->fi_old, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
-            clampedStateDiff(m, y_cache->fi, next, nudge_fwd ? next_plus : NULL,
-                           nudge_back ? next_minus : NULL, eps);
-            waspSparseUpdate(basis, d, y_cache, 2*m->nv+m->na, m->nu);
-            y_accurate=closeEnough(y_cache->fi_old, y_cache->fi, 2*m->nv+m->na, dell, dtheta);
+            // difference sensors
+            if (s_cache) {
+                mju_copy(s_cache->fi_old, s_cache->F_hat_T+(s_cache->i)*(m->nsensordata), m->nsensordata);
+                clampedDiff(s_cache->fi, sensor, nudge_fwd ? sensor_plus : NULL,
+                            nudge_back ? sensor_minus : NULL, eps,  m->nsensordata);
+                waspSparseUpdate(basis, d, s_cache, m->nsensordata, m->nu);
+                s_accurate=closeEnough(s_cache->fi_old, s_cache->fi, m->nsensordata, dell, dtheta);
+            }
+            if(y_accurate&&s_accurate) break;
         }
-
-        // difference sensors
-        if (s_cache) {
-            mju_copy(s_cache->fi_old, s_cache->F_hat_T+(s_cache->i)*(m->nsensordata), m->nsensordata);
-            clampedDiff(s_cache->fi, sensor, nudge_fwd ? sensor_plus : NULL,
-                        nudge_back ? sensor_minus : NULL, eps,  m->nsensordata);
-            waspSparseUpdate(basis, d, s_cache, m->nsensordata, m->nu);
-            s_accurate=closeEnough(s_cache->fi_old, s_cache->fi, m->nsensordata, dell, dtheta);
-        }
-        if(y_accurate&s_accurate) break;
     }
     return res;
 }
@@ -235,73 +235,74 @@ static int mjd_stepWASPDv(const mjModel* m,
                            mjData* d,
                            mjtNum eps, mjtByte flg_centered,
                            int skipsensor, unsigned int restore_spec,
-                           mjtNum dtheta, mjtNum dell, int max_n,
+                           mjtNum dtheta, mjtNum dell, int min_n,
                            mjtNum* next_plus, mjtNum* next_minus,  mjtNum* sensor_plus, mjtNum* sensor_minus,
                            mjWASPCache* y_cache, mjWASPCache* s_cache){
     mjtNum* delta_v = mj_stackAllocNum(d, m->nv);
     int res=0;
-    for(int i=0; i<max_n ;i++){
-    //size_t iv = y_cache?y_cache->i:s_cache->i;
-    // nudge forward
-    //d->qvel[iv] += eps;
-    if (y_cache) {
+    for(int i=0; i<m->nv ;i++) {
+        //size_t iv = y_cache?y_cache->i:s_cache->i;
+        // nudge forward
+        //d->qvel[iv] += eps;
+        if (y_cache) {
             mju_scl(delta_v, basis->C2+y_cache->i*m->nv, eps, m->nv);
         }
-   else {
+        else {
             mju_scl(delta_v, basis->C2+s_cache->i*m->nv, eps, m->nv);
         }
         mju_addTo(d->qvel, delta_v, m->nv);
 
-    // step, get nudged output
-    mj_stepSkip(m, d, mjSTAGE_POS, skipsensor);res++;
-    getState(m, d, next_plus, sensor_plus);
-    // reset
-    mj_setState(m, d, fullstate, restore_spec);
-
-    // nudge backward
-    if (flg_centered) {
-        // nudge
-        //d->qvel[iv] -= eps;
-        if (y_cache) {
-            mju_scl(delta_v, basis->C2+y_cache->i*m->nv, -eps, m->nv);
-        }
-        else {
-            mju_scl(delta_v, basis->C2+s_cache->i*m->nv, -eps, m->nv);
-        }
-        mju_addTo(d->qvel, delta_v, m->nv);
         // step, get nudged output
         mj_stepSkip(m, d, mjSTAGE_POS, skipsensor);res++;
-        getState(m, d, next_minus, sensor_minus);
-
+        getState(m, d, next_plus, sensor_plus);
         // reset
         mj_setState(m, d, fullstate, restore_spec);
-    }
 
-    // difference states
-    mjtByte y_accurate=1, s_accurate=1;
-    if (y_cache) {
-        mju_copy(y_cache->fi_old, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
-        if (!flg_centered) {
-            stateDiff(m, y_cache->fi, next, next_plus, eps);
-        } else {
-            stateDiff(m, y_cache->fi, next_minus, next_plus, 2*eps);
-        }
-        waspSparseUpdate(basis, d, y_cache, 2*m->nv+m->na, m->nv);
-        y_accurate=closeEnough(y_cache->fi_old, y_cache->fi, 2*m->nv+m->na,dell, dtheta);
-    }
+        // nudge backward
+        if (flg_centered) {
+            // nudge
+            //d->qvel[iv] -= eps;
+            if (y_cache) {
+                mju_scl(delta_v, basis->C2+y_cache->i*m->nv, -eps, m->nv);
+            }
+            else {
+                mju_scl(delta_v, basis->C2+s_cache->i*m->nv, -eps, m->nv);
+            }
+            mju_addTo(d->qvel, delta_v, m->nv);
+            // step, get nudged output
+            mj_stepSkip(m, d, mjSTAGE_POS, skipsensor);res++;
+            getState(m, d, next_minus, sensor_minus);
 
-    // difference sensors
-    if (s_cache) {
-        mju_copy(s_cache->fi_old, s_cache->F_hat_T+(s_cache->i)*(m->nsensordata), m->nsensordata);
-        if (!flg_centered) {
-            diff(s_cache->fi, sensor, sensor_plus, eps, m->nsensordata);
-        } else {
-            diff(s_cache->fi, sensor_minus, sensor_plus, 2*eps, m->nsensordata);
+            // reset
+            mj_setState(m, d, fullstate, restore_spec);
         }
-        waspSparseUpdate(basis, d, s_cache, m->nsensordata,  m->nv);
-        s_accurate=closeEnough(s_cache->fi_old, s_cache->fi, m->nsensordata,dell, dtheta);
-    }
-        if(y_accurate&s_accurate) break;
+        if (i>=min_n-1){
+            // difference states
+            mjtByte y_accurate=1, s_accurate=1;
+            if (y_cache) {
+                mju_copy(y_cache->fi_old, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
+                if (!flg_centered) {
+                    stateDiff(m, y_cache->fi, next, next_plus, eps);
+                } else {
+                    stateDiff(m, y_cache->fi, next_minus, next_plus, 2*eps);
+                }
+                waspSparseUpdate(basis, d, y_cache, 2*m->nv+m->na, m->nv);
+                y_accurate=closeEnough(y_cache->fi_old, y_cache->fi, 2*m->nv+m->na,dell, dtheta);
+            }
+
+            // difference sensors
+            if (s_cache) {
+                mju_copy(s_cache->fi_old, s_cache->F_hat_T+(s_cache->i)*(m->nsensordata), m->nsensordata);
+                if (!flg_centered) {
+                    diff(s_cache->fi, sensor, sensor_plus, eps, m->nsensordata);
+                } else {
+                    diff(s_cache->fi, sensor_minus, sensor_plus, 2*eps, m->nsensordata);
+                }
+                waspSparseUpdate(basis, d, s_cache, m->nsensordata,  m->nv);
+                s_accurate=closeEnough(s_cache->fi_old, s_cache->fi, m->nsensordata,dell, dtheta);
+            }
+            if(y_accurate&&s_accurate) break;
+        }
     }
 return res;
 }
@@ -314,34 +315,15 @@ static int mjd_stepWASPDa(const mjModel* m,
                            mjData* d,
                            mjtNum eps, mjtByte flg_centered,
                            int skipsensor, unsigned int restore_spec,
-                           mjtNum dtheta, mjtNum dell, int max_n,
+                           mjtNum dtheta, mjtNum dell, int min_n,
                            mjtNum* next_plus, mjtNum* next_minus,  mjtNum* sensor_plus, mjtNum* sensor_minus,
                            mjWASPCache* y_cache, mjWASPCache* s_cache){
     mjtNum* delta_a = mj_stackAllocNum(d, m->na);
     int res=0;
-    for(int i=0; i<max_n ;i++){
-    //size_t ia = y_cache?y_cache->i:s_cache->i;
-    // nudge forward
-    //d->act[ia] += eps;
-        if (y_cache) {
-            mju_scl(delta_a, basis->C2+y_cache->i*m->na, eps, m->na);
-        }
-        else {
-            mju_scl(delta_a, basis->C2+s_cache->i*m->na, eps, m->na);
-        }
-        mju_addTo(d->ctrl, delta_a, m->na);
-
-    // step, get nudged output
-    mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor); res++;
-    getState(m, d, next_plus, sensor_plus);
-
-    // reset
-    mj_setState(m, d, fullstate, restore_spec);
-
-    // nudge backward
-    if (flg_centered) {
-        // nudge backward
-        //d->act[ia] -= eps;
+    for(int i=0; i<m->na ;i++) {
+        //size_t ia = y_cache?y_cache->i:s_cache->i;
+        // nudge forward
+        //d->act[ia] += eps;
         if (y_cache) {
             mju_scl(delta_a, basis->C2+y_cache->i*m->na, eps, m->na);
         }
@@ -351,40 +333,59 @@ static int mjd_stepWASPDa(const mjModel* m,
         mju_addTo(d->ctrl, delta_a, m->na);
 
         // step, get nudged output
-        mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);res++;
-        getState(m, d, next_minus, sensor_minus);
+        mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor); res++;
+        getState(m, d, next_plus, sensor_plus);
 
         // reset
         mj_setState(m, d, fullstate, restore_spec);
-    }
 
-    // difference states
-    mjtByte y_accurate=1, s_accurate=1;
-    if (y_cache) {
-        mju_copy(y_cache->fi_old, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
-        if (!flg_centered) {
-            stateDiff(m, y_cache->fi, next, next_plus, eps);
-        } else {
-            stateDiff(m, y_cache->fi, next_minus, next_plus, 2*eps);
+        // nudge backward
+        if (flg_centered) {
+            // nudge backward
+            //d->act[ia] -= eps;
+            if (y_cache) {
+                mju_scl(delta_a, basis->C2+y_cache->i*m->na, eps, m->na);
+            }
+            else {
+                mju_scl(delta_a, basis->C2+s_cache->i*m->na, eps, m->na);
+            }
+            mju_addTo(d->ctrl, delta_a, m->na);
+
+            // step, get nudged output
+            mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);res++;
+            getState(m, d, next_minus, sensor_minus);
+
+            // reset
+            mj_setState(m, d, fullstate, restore_spec);
         }
-        waspSparseUpdate(basis, d, y_cache, 2*m->nv+m->na, m->na);
-        y_accurate=closeEnough(y_cache->fi_old, y_cache->fi, 2*m->nv+m->na,dell, dtheta);
-    }
+        if (i>=min_n-1){
+            // difference states
+            mjtByte y_accurate=1, s_accurate=1;
+            if (y_cache) {
+                mju_copy(y_cache->fi_old, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
+                if (!flg_centered) {
+                    stateDiff(m, y_cache->fi, next, next_plus, eps);
+                } else {
+                    stateDiff(m, y_cache->fi, next_minus, next_plus, 2*eps);
+                }
+                waspSparseUpdate(basis, d, y_cache, 2*m->nv+m->na, m->na);
+                y_accurate=closeEnough(y_cache->fi_old, y_cache->fi, 2*m->nv+m->na,dell, dtheta);
+            }
 
-    // difference sensors
-    if (s_cache) {
-        mju_copy(s_cache->fi_old, s_cache->F_hat_T+(s_cache->i)*(m->nsensordata), m->nsensordata);
-        if (!flg_centered) {
-            diff(s_cache->fi, sensor, sensor_plus, eps, m->nsensordata);
-        } else {
-            diff(s_cache->fi, sensor_minus, sensor_plus, 2*eps, m->nsensordata);
+            // difference sensors
+            if (s_cache) {
+                mju_copy(s_cache->fi_old, s_cache->F_hat_T+(s_cache->i)*(m->nsensordata), m->nsensordata);
+                if (!flg_centered) {
+                    diff(s_cache->fi, sensor, sensor_plus, eps, m->nsensordata);
+                } else {
+                    diff(s_cache->fi, sensor_minus, sensor_plus, 2*eps, m->nsensordata);
+                }
+                waspSparseUpdate(basis, d, s_cache, m->nsensordata, m->na);
+                s_accurate=closeEnough(s_cache->fi_old, s_cache->fi, m->nsensordata,dell, dtheta);
+            }
+            if(y_accurate&&s_accurate) break;
         }
-        waspSparseUpdate(basis, d, s_cache, m->nsensordata, m->na);
-        s_accurate=closeEnough(s_cache->fi_old, s_cache->fi, m->nsensordata,dell, dtheta);
     }
-        if(y_accurate&s_accurate) break;
-    }
-
     return res;
 }
 
@@ -396,62 +397,63 @@ static int mjd_stepWASPDq(const mjModel* m,
                            mjData* d,
                            mjtNum eps, mjtByte flg_centered,
                            int skipsensor, unsigned int restore_spec,
-                           mjtNum dtheta, mjtNum dell, int max_n,
+                           mjtNum dtheta, mjtNum dell, int min_n,
                            mjtNum* next_plus, mjtNum* next_minus,  mjtNum* sensor_plus, mjtNum* sensor_minus,
                            mjWASPCache* y_cache, mjWASPCache* s_cache){
     mjtNum* delta_q = mj_stackAllocNum(d, m->nv);
     int res=0;
-    for(int i=0; i<max_n ;i++){
-    //size_t iq = y_cache?y_cache->i:s_cache->i;
-    if (y_cache) mju_copy(delta_q, basis->C2+y_cache->i*m->nv, m->nv);
-    else mju_copy(delta_q, basis->C2+s_cache->i*m->nv, m->nv);
-    mj_integratePos(m, d->qpos, delta_q, eps);
-
-    // step, get nudged output
-    mj_stepSkip(m, d, mjSTAGE_NONE, skipsensor);res++;
-    getState(m, d, next_plus, sensor_plus);
-
-    // reset
-    mj_setState(m, d, fullstate, restore_spec);
-
-    // nudge backward
-    if (flg_centered) {
-        // nudge backward
-        mj_integratePos(m, d->qpos, delta_q, -eps);
+    for(int i=0; i<m->nv ;i++) {
+        //size_t iq = y_cache?y_cache->i:s_cache->i;
+        if (y_cache) mju_copy(delta_q, basis->C2+y_cache->i*m->nv, m->nv);
+        else mju_copy(delta_q, basis->C2+s_cache->i*m->nv, m->nv);
+        mj_integratePos(m, d->qpos, delta_q, eps);
 
         // step, get nudged output
         mj_stepSkip(m, d, mjSTAGE_NONE, skipsensor);res++;
-        getState(m, d, next_minus, sensor_minus);
+        getState(m, d, next_plus, sensor_plus);
 
         // reset
         mj_setState(m, d, fullstate, restore_spec);
-    }
 
-    // difference states
-        mjtByte y_accurate=1, s_accurate=1;
-    if (y_cache) {
-        mju_copy(y_cache->fi_old, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
-        if (!flg_centered) {
-            stateDiff(m, y_cache->fi, next, next_plus, eps);
-        } else {
-            stateDiff(m, y_cache->fi, next_minus, next_plus, 2*eps);
-        }
-        waspSparseUpdate(basis, d, y_cache, 2*m->nv+m->na, m->nv);
-        y_accurate=closeEnough(y_cache->fi_old, y_cache->fi, 2*m->nv+m->na,dell, dtheta);
-    }
+        // nudge backward
+        if (flg_centered) {
+            // nudge backward
+            mj_integratePos(m, d->qpos, delta_q, -eps);
 
-    // difference sensors
-    if (s_cache) {
-        mju_copy(s_cache->fi_old, s_cache->F_hat_T+(s_cache->i)*(m->nsensordata), m->nsensordata);
-        if (!flg_centered) {
-            diff(s_cache->fi, sensor, sensor_plus, eps, m->nsensordata);
-        } else {
-            diff(s_cache->fi, sensor_minus, sensor_plus, 2*eps, m->nsensordata);
+            // step, get nudged output
+            mj_stepSkip(m, d, mjSTAGE_NONE, skipsensor);res++;
+            getState(m, d, next_minus, sensor_minus);
+
+            // reset
+            mj_setState(m, d, fullstate, restore_spec);
         }
-        waspSparseUpdate(basis, d, s_cache, m->nsensordata, m->nv);
-        s_accurate=closeEnough(s_cache->fi_old, s_cache->fi,  m->nsensordata, dell, dtheta);
-    }
-        if(y_accurate&s_accurate) break;
+        if (i>=min_n-1){
+            // difference states
+            mjtByte y_accurate=1, s_accurate=1;
+            if (y_cache) {
+                mju_copy(y_cache->fi_old, y_cache->F_hat_T+(y_cache->i)*(2*m->nv+m->na), 2*m->nv+m->na);
+                if (!flg_centered) {
+                    stateDiff(m, y_cache->fi, next, next_plus, eps);
+                } else {
+                    stateDiff(m, y_cache->fi, next_minus, next_plus, 2*eps);
+                }
+                waspSparseUpdate(basis, d, y_cache, 2*m->nv+m->na, m->nv);
+                y_accurate=closeEnough(y_cache->fi_old, y_cache->fi, 2*m->nv+m->na,dell, dtheta);
+            }
+
+            // difference sensors
+            if (s_cache) {
+                mju_copy(s_cache->fi_old, s_cache->F_hat_T+(s_cache->i)*(m->nsensordata), m->nsensordata);
+                if (!flg_centered) {
+                    diff(s_cache->fi, sensor, sensor_plus, eps, m->nsensordata);
+                } else {
+                    diff(s_cache->fi, sensor_minus, sensor_plus, 2*eps, m->nsensordata);
+                }
+                waspSparseUpdate(basis, d, s_cache, m->nsensordata, m->nv);
+                s_accurate=closeEnough(s_cache->fi_old, s_cache->fi,  m->nsensordata, dell, dtheta);
+            }
+            if(y_accurate&&s_accurate) break;
+        }
     }
     return res;
 }
@@ -481,10 +483,10 @@ int mjd_transitionWASP(const mjModel* m,
                         const mjWASPBasis* q_basis, const mjWASPBasis* v_basis,
                         const mjWASPBasis* a_basis, const mjWASPBasis* u_basis,
                         mjData* d, mjtNum eps, mjtByte flg_centered,
-                        mjtNum q_dtheta, mjtNum q_dell, int q_max_n,
-                        mjtNum v_dtheta, mjtNum v_dell, int v_max_n,
-                        mjtNum a_dtheta, mjtNum a_dell, int a_max_n,
-                        mjtNum u_dtheta, mjtNum u_dell, int u_max_n,
+                        mjtNum q_dtheta, mjtNum q_dell, int q_min_n,
+                        mjtNum v_dtheta, mjtNum v_dell, int v_min_n,
+                        mjtNum a_dtheta, mjtNum a_dell, int a_min_n,
+                        mjtNum u_dtheta, mjtNum u_dell, int u_min_n,
                         mjtNum* A, mjtNum* B, mjtNum* C, mjtNum* D,
                         mjWASPCache* DyDq, mjWASPCache* DyDv, mjWASPCache* DyDa,
                         mjWASPCache* DyDu,
@@ -539,7 +541,7 @@ int mjd_transitionWASP(const mjModel* m,
     if (DyDu || DsDu) res+=mjd_stepWASPDu(m, fullstate, next, sensor, ctrl, u_basis,
                                      d,
                                      eps, flg_centered, skipsensor, restore_spec,
-                                     u_dtheta, u_dell ,mju_min(u_max_n,nu),
+                                     u_dtheta, u_dell ,mju_max(u_min_n,1),
                                      next_plus, next_minus, sensor_plus, sensor_minus,
                                      DyDu, DsDu);
 
@@ -547,7 +549,7 @@ int mjd_transitionWASP(const mjModel* m,
     if (DyDa || DsDa) res+=mjd_stepWASPDa(m, fullstate, next, sensor,a_basis,
                                      d,
                                      eps, flg_centered, skipsensor, restore_spec,
-                                     a_dtheta, a_dell ,mju_min(a_max_n,na),
+                                     a_dtheta, a_dell ,mju_max(a_min_n,1),
                                      next_plus, next_minus, sensor_plus, sensor_minus,
                                      DyDa, DsDa);
 
@@ -555,7 +557,7 @@ int mjd_transitionWASP(const mjModel* m,
     if (DyDv || DsDv) res+=mjd_stepWASPDv(m, fullstate, next, sensor,v_basis,
                                      d,
                                      eps, flg_centered, skipsensor, restore_spec,
-                                     v_dtheta, v_dell ,mju_min(v_max_n,nv),
+                                     v_dtheta, v_dell ,mju_max(v_min_n,1),
                                      next_plus, next_minus, sensor_plus, sensor_minus,
                                      DyDv, DsDv);
 
@@ -563,7 +565,7 @@ int mjd_transitionWASP(const mjModel* m,
     if (DyDq || DsDq) res+=mjd_stepWASPDq(m, fullstate, next, sensor,q_basis,
                                      d,
                                      eps, flg_centered, skipsensor, restore_spec,
-                                     q_dtheta, q_dell ,mju_min(q_max_n,nv),
+                                     q_dtheta, q_dell ,mju_max(q_min_n,1),
                                      next_plus, next_minus, sensor_plus, sensor_minus,
                                      DyDq, DsDq);
 
@@ -593,7 +595,7 @@ int mjd_transitionWASP(const mjModel* m,
 }
 
 int mjd_transitionWASPOneThread(const mjModel *m, const mjWASPBasis* basis, mjData *d, mjtNum eps, mjtByte flg_centered,
-                                 mjtNum dtheta, mjtNum dell, int max_n,
+                                 mjtNum dtheta, mjtNum dell, int min_n,
                                  mjtNum *derivT,
                                  mjWASPCache *cache, mjPartialDerivativeType type) {
 
@@ -646,7 +648,7 @@ int mjd_transitionWASPOneThread(const mjModel *m, const mjWASPBasis* basis, mjDa
            res = mjd_stepWASPDu(m, fullstate, next, sensor, ctrl, basis,
                                     d,
                                     eps, flg_centered, skipsensor, restore_spec,
-                                    dtheta, dell ,mju_min(max_n,nu),
+                                    dtheta, dell ,mju_max(min_n,1),
                                     next_plus, next_minus, sensor_plus, sensor_minus,
                                     cache, NULL);
             mju_copy(derivT, cache->DT, ndx*nu);
@@ -655,7 +657,7 @@ int mjd_transitionWASPOneThread(const mjModel *m, const mjWASPBasis* basis, mjDa
             res = mjd_stepWASPDv(m, fullstate, next, sensor,basis,
                                    d,
                                    eps, flg_centered, skipsensor, restore_spec,
-                                   dtheta, dell ,mju_min(max_n,nv),
+                                   dtheta, dell ,mju_max(min_n,1),
                                    next_plus, next_minus, sensor_plus, sensor_minus,
                                    cache, NULL);
             mju_copy(derivT, cache->DT, ndx*nv);
@@ -664,7 +666,7 @@ int mjd_transitionWASPOneThread(const mjModel *m, const mjWASPBasis* basis, mjDa
             res = mjd_stepWASPDa(m, fullstate, next, sensor,basis,
                                    d,
                                    eps, flg_centered, skipsensor, restore_spec,
-                                   dtheta, dell ,mju_min(max_n,na),
+                                   dtheta, dell ,mju_max(min_n,1),
                                    next_plus, next_minus, sensor_plus, sensor_minus,
                                    cache, NULL);
             mju_copy(derivT, cache->DT, ndx*na);
@@ -673,7 +675,7 @@ int mjd_transitionWASPOneThread(const mjModel *m, const mjWASPBasis* basis, mjDa
             res = mjd_stepWASPDq(m, fullstate, next, sensor,basis,
                                  d,
                                  eps, flg_centered, skipsensor, restore_spec,
-                                 dtheta, dell ,mju_min(max_n,nv),
+                                 dtheta, dell ,mju_max(min_n,1),
                                  next_plus, next_minus, sensor_plus, sensor_minus,
                                  cache, NULL);
             mju_copy(derivT, cache->DT, ndx*nv);
@@ -682,7 +684,7 @@ int mjd_transitionWASPOneThread(const mjModel *m, const mjWASPBasis* basis, mjDa
              res =mjd_stepWASPDu(m, fullstate, next, sensor, ctrl,basis,
                                      d,
                                      eps, flg_centered, skipsensor, restore_spec,
-                                     dtheta, dell ,mju_min(max_n,nu),
+                                     dtheta, dell ,mju_max(min_n,1),
                                      next_plus, next_minus, sensor_plus, sensor_minus,
                                      NULL, cache);
             mju_copy(derivT, cache->DT, ns*nu);
@@ -691,7 +693,7 @@ int mjd_transitionWASPOneThread(const mjModel *m, const mjWASPBasis* basis, mjDa
              res =mjd_stepWASPDv(m, fullstate, next, sensor,basis,
                                      d,
                                      eps, flg_centered, skipsensor, restore_spec,
-                                     dtheta, dell ,mju_min(max_n,nv),
+                                     dtheta, dell ,mju_max(min_n,1),
                                      next_plus, next_minus, sensor_plus, sensor_minus,
                                      NULL, cache);
             mju_copy(derivT, cache->DT, ns*nv);
@@ -700,7 +702,7 @@ int mjd_transitionWASPOneThread(const mjModel *m, const mjWASPBasis* basis, mjDa
             res = mjd_stepWASPDa(m, fullstate, next, sensor,basis,
                                    d,
                                    eps, flg_centered, skipsensor, restore_spec,
-                                   dtheta, dell ,mju_min(max_n,na),
+                                   dtheta, dell ,mju_max(min_n,1),
                                    next_plus, next_minus, sensor_plus, sensor_minus,
                                    NULL, cache);
             mju_copy(derivT, cache->DT, ns*na);
@@ -710,7 +712,7 @@ int mjd_transitionWASPOneThread(const mjModel *m, const mjWASPBasis* basis, mjDa
             res = mjd_stepWASPDq(m, fullstate, next, sensor,basis,
                                  d,
                                  eps, flg_centered, skipsensor, restore_spec,
-                                 dtheta, dell ,mju_min(max_n,nv),
+                                 dtheta, dell ,mju_max(min_n,1),
                                  next_plus, next_minus, sensor_plus, sensor_minus,
                                  NULL, cache);
             mju_copy(derivT, cache->DT, ns*nv);

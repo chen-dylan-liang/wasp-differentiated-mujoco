@@ -37,10 +37,10 @@ extern "C" {
                         const mjWASPBasis* q_basis, const mjWASPBasis* v_basis,
                         const mjWASPBasis* a_basis, const mjWASPBasis* u_basis,
                         mjData* d, mjtNum eps, mjtByte flg_centered,
-                        mjtNum q_dtheta, mjtNum q_dell, int q_max_n,
-                        mjtNum v_dtheta, mjtNum v_dell, int v_max_n,
-                        mjtNum a_dtheta, mjtNum a_dell, int a_max_n,
-                        mjtNum u_dtheta, mjtNum u_dell, int u_max_n,
+                        mjtNum q_dtheta, mjtNum q_dell, int q_min_n,
+                        mjtNum v_dtheta, mjtNum v_dell, int v_min_n,
+                        mjtNum a_dtheta, mjtNum a_dell, int a_min_n,
+                        mjtNum u_dtheta, mjtNum u_dell, int u_min_n,
                         mjtNum* A, mjtNum* B, mjtNum* C, mjtNum* D,
                         mjWASPCache* DyDq, mjWASPCache* DyDv, mjWASPCache* DyDa,
                         mjWASPCache* DyDu,
@@ -49,7 +49,7 @@ extern "C" {
 
     // per thread wasp differenced transition matrices (control theory notation)
     MJAPI int mjd_transitionWASPOneThread(const mjModel *m, const mjWASPBasis* basis, mjData *d, mjtNum eps, mjtByte flg_centered,
-                                  mjtNum dtheta, mjtNum dell, int max_n,
+                                  mjtNum dtheta, mjtNum dell, int min_n,
                                   mjtNum *derivT,
                                   mjWASPCache *cache, mjPartialDerivativeType type);
     // copy wasp cache
