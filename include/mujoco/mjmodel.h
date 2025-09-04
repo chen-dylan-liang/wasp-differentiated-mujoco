@@ -594,7 +594,8 @@ typedef struct mjWASPBasis_ {
 typedef struct mjWASPCache_{
     mjtNum* F_hat_T;
     mjtNum* fi;
-    mjtNum* fi_old;
+    mjtNum* tmp_n_m;
+    mjtNum* tmp_m;
     mjtNum* DT;
     size_t i;
 } mjWASPCache;
