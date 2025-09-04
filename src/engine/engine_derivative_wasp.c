@@ -337,7 +337,7 @@ static int mjd_stepWASPDa(const mjModel* m,
         else {
             mju_scl(delta_a, basis->C2+s_cache->i*m->na, eps, m->na);
         }
-        mju_addTo(d->ctrl, delta_a, m->na);
+        mju_addTo(d->act, delta_a, m->na);
 
         // step, get nudged output
         mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor); res++;
@@ -356,7 +356,7 @@ static int mjd_stepWASPDa(const mjModel* m,
             else {
                 mju_scl(delta_a, basis->C2+s_cache->i*m->na, eps, m->na);
             }
-            mju_addTo(d->ctrl, delta_a, m->na);
+            mju_addTo(d->act, delta_a, m->na);
 
             // step, get nudged output
             mj_stepSkip(m, d, mjSTAGE_VEL, skipsensor);res++;
