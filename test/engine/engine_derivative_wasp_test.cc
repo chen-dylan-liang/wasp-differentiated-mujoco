@@ -1,6 +1,4 @@
-//
-// Created by dylanmac on 8/20/25.
-//
+
 #include <iomanip>
 #include <iostream>
 #include <random>

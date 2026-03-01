@@ -1,6 +1,4 @@
-//
-// Created by dylan on 7/26/25.
-//
+
 
 #ifndef MUJOCO_SRC_ENGINE_ENGINE_DERIVATIVE_WASP_H_
 #define MUJOCO_SRC_ENGINE_ENGINE_DERIVATIVE_WASP_H_
